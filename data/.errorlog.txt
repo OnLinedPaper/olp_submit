@@ -1,0 +1,9 @@
+2017-03-31 02:23:03.192513
+
+Traceback (most recent call last):
+  File "olp_submit_v3.py", line 488, in send_group_name
+    WebDriverWait(driver, delay).until(element_present)
+  File "/home/paper/anaconda3/lib/python3.5/site-packages/selenium/webdriver/support/wait.py", line 80, in until
+    raise TimeoutException(message, screen, stacktrace)
+selenium.common.exceptions.TimeoutException: Message: 
+
