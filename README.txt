@@ -4,6 +4,16 @@ tl;dr do whatever you want with it but don't add extra copyright junk
 
 ===============================================================================
 
+SHORT VERSION
+
+this is a set of programs designed to make submitting art to groups on 
+deviantART faster. the programs use the Selenium automated testing libraries 
+to control a browser window, automating the submission process.
+
+
+
+===============================================================================
+
 INSTALLATION GUIDE
 
 (under construction)
