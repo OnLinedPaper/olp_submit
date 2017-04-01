@@ -191,7 +191,7 @@ while(login_success != True):
         driver.close()
         exit()
 
-    if(driver.current_url != 'http://www.deviantart.com/browse/all/'):
+    if('deviantart.com/browse/all/' not in driver.current_url):
         #something went wrong with the login; we weren't redirected
         #to the browse page (this happens on successful login)
         try:
