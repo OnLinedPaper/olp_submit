@@ -16,7 +16,7 @@ run group_read first to get a list of all groups you are a part of.
 
 run list_make next to make specific lists for different types of art.
 
-run submit last to begin the automated submission process.
+run submit_v2 last to begin the automated submission process.
 
 ===============================================================================
 

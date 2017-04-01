@@ -355,7 +355,6 @@ def login():
         while('deviantart.com/browse/all/' not in driver.current_url):
             #repeat until they log in successfully
             #(it goes to that url when they log in)
-            #TODO: more elegant way to check for login
             login_not_me()
             #clear away improper input
             login_send_keys(str(get_username()), str(get_password()))
@@ -445,6 +444,16 @@ def logout():
         close_webdriver()
         exit()
 
+    except WebDriverException as e:
+        #the driver was probably closed already.
+        print(bcolors.BADRED + 'logout error' + bcolors.ENDC)
+        log_error(e)
+        print(bcolors.SRSYELLOW + \
+        '\n++++ WARNING: SESSION WAS NOT DEACTIVATED ++++')
+        print('go to https://www.deviantart.com/settings/sessions to '\
+        'close the session' + bcolors.ENDC)
+        close_webdriver()
+        exit()
     except Exception as e:
         #something went wrong
         print(bcolors.BADRED + 'logout error' + bcolors.ENDC)
@@ -456,6 +465,30 @@ def logout():
 #BEYOND THIS POINT, THE WEBDRIVER IS LOGGED IN.
 #ERROR HANDLERS MUST LOGOUT TO EXIT THE PROGRAM.
 #==============================================================================
+
+#------------------------------------------------------------------------------
+#submission sub-function
+#takes nothing, modifies nothing, returns a string containing an error
+#message
+#gets an error message when a group cannot be submitted to - this covers groups
+#that don't exist, can't be submitted to, or already include this deviation
+def handle_group_error():
+    try:
+        error_status = modal_box.find_element_by_class_name('error_message')
+        #get the error message box.
+        if(error_status.get_attribute('style') == 'display: block;'):
+            #the error message is showing. return the text of the message.
+            return(str(error_status.find_element_by_tag_name('span').text))
+        else:
+            #the error message is not showing. return a generic error.
+            error_m = '(handle_group_error was called, but no error message '
+            error_m = error_m + 'was showing.)'
+            return(error_m)
+
+    except Exception as e:
+        print(bcolors.BADRED + 'handle_group_error error' + bcolors.ENDC)
+        log_error(e)
+        logout()
 
 #------------------------------------------------------------------------------
 #navigation function
@@ -580,9 +613,9 @@ def get_check_button():
         logout()
 
 #------------------------------------------------------------------------------
-#automated submission function
+#submission function
 #takes a group name, modifies driver by using entry_field and check_button,
-#and returns nothing
+#returns nothing on success, error message on failure
 def send_group_name(name):
     try:
         entry_field.clear()
@@ -596,42 +629,38 @@ def send_group_name(name):
         ((By.CLASS_NAME, 'selected_group_info'))
         WebDriverWait(driver, delay).until(element_present)
 
+        #the group info appeared; we can continue
+        return ''
+
     except TimeoutException as e:
-        print(handle_group_error())
-        pass
+        #the group info never appeared - an error probably occurred.
+        return(handle_group_error())
+
     except Exception as e:
         print(bcolors.BADRED + 'send_group_name error' + bcolors.ENDC)
         log_error(e)
         logout()
 
 #------------------------------------------------------------------------------
-#submission sub-function
-#takes nothing, modifies nothing, returns a string containing an error
-#message
-#gets an error message when a group cannot be submitted to - this covers groups
-#that don't exist, can't be submitted to, or already include this deviation
-def handle_group_error():
+#submission function
+#takes no arguments, returns a webelement that can be used to iterate through
+#folders available for this gallery
+def get_folder_options():
     try:
-        error_status = modal_box.find_element_by_class_name('error_message')
-        #get the error message box.
-        if(error_status.get_attribute('style') == 'display: block;'):
-            #the error message is showing. return the text of the message.
-            return(str(error_status.find_element_by_tag_name('span').text))
-        else:
-            #the error message is not showing. return an empty string.
-            return ''
+        folder_element = modal_box.find_element_by_id('gallery_selection')
+        #find the selection box
+        f_options = folder_element.find_elements_by_tag_name('option')
+        #get the folder options, in list form
+        return(f_options)
+        #return the list of options
 
     except Exception as e:
-        print(bcolors.BADRED + 'handle_group_error error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_folder_element error' + bcolors.ENDC)
         log_error(e)
         logout()
 
 #==============================================================================
 #main function
-
-uname = ''
-pword = ''
-dpage = ''
 
 do_later = {}
 csv_file_name = ''
@@ -646,8 +675,7 @@ driver = open_webdriver()
 
 login()
 
-dpage = get_dev_url()
-get_deviation_page(dpage)
+get_deviation_page(get_dev_url())
 open_submission_box()
 
 global modal_box
@@ -662,11 +690,19 @@ global check_button
 check_button = get_check_button()
 #declared explicitly as global so any function can use these
 
-send_group_name('proving----grounds')
+print(send_group_name('proving----grounds'))
 #group that exists
-send_group_name('DSGLHLSFHGJDL')
+print(send_group_name('DSGLHLSFHGJDL'))
 #group that doesn't
-send_group_name('proving----grounds')
-#group that exists
+
+if not send_group_name('proving----grounds'):
+    #ensure successful groups pass an empty string
+    print('pass')
+folder_options = get_folder_options()
+for option in folder_options:
+    #print the folders
+    print(option.text)
+
+#TODO: delete these
 
 logout()
