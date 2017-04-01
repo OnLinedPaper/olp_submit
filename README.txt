@@ -6,27 +6,30 @@ tl;dr do whatever you want with it but don't add extra copyright junk
 
 SHORT VERSION
 
-this is a set of programs designed to make submitting art to groups on 
-deviantART faster. the programs use the Selenium automated testing libraries 
+this is a set of programs designed to make submitting art to groups on
+deviantART faster. the programs use the Selenium automated testing libraries
 to control a browser window, automating the submission process.
 
 
+run olp_group_read first to get a list of all groups you are a part of.
+(the list this creates can be passed to olp_submit)
 
-===============================================================================
+run olp_list_make next to make specific lists for different types of art.
 
-INSTALLATION GUIDE
-
-(under construction)
+run olp_submit last to begin the automated submission process.
 
 ===============================================================================
 
 GENERAL USAGE NOTES
+
+- V3 IS STILL UNDER CONSTRUCTION. PLEASE USE V2.
 - use olp_group_read.py to make a list of groups, olp_list_make to create
   specialized lists for different art types, and olp_submit to submit things
   to dA.
-- please don't try to break the program. you probably won't succeed, since
-  i preempted a few of the most obvious bugs, but you'll break it eventually if
-  you try hard enough.
+- please don't try to break the program. you will probably succeed. (if you
+  ignore this and do manage to break the program, though, please send me a copy
+  of the .errorlog.txt file so I can see what went wrong. It'll be in /data
+  [but be careful, it resets every time you run the program])
 - once you start using olp_submit.py, the main submission program, don't stop
   until execution is completed - it can't save your progress yet.
 
