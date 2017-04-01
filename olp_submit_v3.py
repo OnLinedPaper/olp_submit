@@ -77,6 +77,26 @@ def log_error(e):
 #takes no arguments and sets up the external data
 def setup():
     try:
+        #ensure the "data" folder exists
+        if not (os.path.exists('data')):
+            #data folder does not exist
+            #probably means csv folders also don't exist
+            os.makedirs('data')
+            print(bcolors.WARNYELLOW + \
+            'please load CSV files into data folder')
+            exit()
+
+    except Exception as e:
+        #i don't anticipate an error ever occuring here
+        print(bcolors.BADRED, end='')
+        print('setup error: error while checking for data folder.', end='')
+        print(type(e), '\t\"', e, '\"', end='')
+        print(bcolors.ENDC)
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
+    try:
         #set up error log file
         errorlog = './data/.errorlog.txt'
         #store name for easier use
@@ -96,7 +116,9 @@ def setup():
         print(type(e), '\t\"', e, '\"', end='')
         print(bcolors.ENDC)
         exit()
+
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
     try:
         #set up the replacement file
         replacefile = './data/.replace.csv'
@@ -117,7 +139,9 @@ def setup():
         bcolors.ENDC)
         log_error(e)
         exit()
+
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
     try:
         #set up the "deal with this later" file
         laterfile = './data/.later.csv'
@@ -140,7 +164,9 @@ def setup():
         bcolors.ENDC)
         log_error(e)
         exit()
+
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
     try:
         if not os.path.isfile('./data/chromedriver') \
         and not os.path.isfile('C:\Windows\chromedriver.exe'):
@@ -267,9 +293,10 @@ def get_dev_url():
 #takes no arguments, modifies driver, and returns nothing
 def login():
     try:
-        while(driver.current_url != 'http://www.deviantart.com/browse/all/'):
+        while('deviantart.com/browse/all/' not in driver.current_url):
             #repeat until they log in successfully
             #(it goes to that url when they log in)
+            #TODO: more elegant way to check for login
             login_not_me()
             #clear away improper input
             login_send_keys(str(get_username()), str(get_password()))
@@ -488,16 +515,32 @@ def send_group_name(name):
         WebDriverWait(driver, delay).until(element_present)
 
     except TimeoutException as e:
-        #TODO: change this to handle groups that don't exist or can't be
-        #submitted to
-        print(bcolors.BADRED, end='')
-        print('send_group_name error: ', \
-        'the success message wasn\'t there.', end='')
-        print(bcolors.ENDC)
-        log_error(e)
-        logout()
+        print(handle_group_error())
+        pass
     except Exception as e:
         print(bcolors.BADRED + 'send_group_name error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
+#------------------------------------------------------------------------------
+#submission sub-function
+#takes nothing, modifies nothing, returns a string containing an error
+#message
+#gets an error message when a group cannot be submitted to - this covers groups
+#that don't exist, can't be submitted to, or already include this deviation
+def handle_group_error():
+    try:
+        error_status = modal_box.find_element_by_class_name('error_message')
+        #get the error message box.
+        if(error_status.get_attribute('style') == 'display: block;'):
+            #the error message is showing. return the text of the message.
+            return(str(error_status.find_element_by_tag_name('span').text))
+        else:
+            #the error message is not showing. return an empty string.
+            return ''
+
+    except Exception as e:
+        print(bcolors.BADRED + 'handle_group_error error' + bcolors.ENDC)
         log_error(e)
         logout()
 
@@ -564,6 +607,7 @@ send_group_name('proving----grounds')
 #group that exists
 send_group_name('DSGLHLSFHGJDL')
 #group that doesn't
-
+send_group_name('proving----grounds')
+#group that exists
 
 logout()
