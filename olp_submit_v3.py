@@ -8,6 +8,8 @@ from selenium.webdriver.support import expected_conditions as EC
 #for waiting for other stuff to load
 from selenium.common.exceptions import TimeoutException
 #for when waiting for stuff to load takes too long
+from selenium.common.exceptions import WebDriverException
+#for if the user closes the browser window
 from selenium.webdriver.common.by import By
 #also used when waiting for stuff to load
 #bunch of selenium things
@@ -61,6 +63,21 @@ def log_error(e):
             elog.write(errordate)
             elog.write(traceback.format_exc())
 
+        with open('./data/.errorarchive.txt', 'a') as earc:
+            #write the error to archive
+            errordate = str(datetime.datetime.now()) + '\n\n'
+            earc.write(errordate)
+            earc.write(traceback.format_exc())
+
+            #write a dashed line to make the file easier to read
+            dash = '\n'
+            for i in range(0,80):
+                #make it 80 dashes wide
+                dash = dash + '='
+            dash = dash + '\n\n'
+            #write the dash
+            earc.write(dash)
+
         #print the error for the user to see
         print(bcolors.BADRED, end='')
         print('error type:\t', type(e), '\n\"', e, '\"\n', end='')
@@ -109,10 +126,31 @@ def setup():
 
     except Exception as e:
         #if an error occurs here, it's probably something to do with the
-        #error log. this is the only except function that won't call
+        #error log. this is one of two except functions that won't call
         #log_error, since it would try to reference a bad file.
         print(bcolors.BADRED, end='')
         print('setup error: error while setting up errorlog file.', end='')
+        print(type(e), '\t\"', e, '\"', end='')
+        print(bcolors.ENDC)
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
+    try:
+        #set up permanent error archive file
+        errorrec = './data/.errorarchive.txt'
+        #store the name for easier use
+        if not os.path.isfile(errorrec):
+            #if there is not an error archive, make one
+            with open(errorrec, 'a'):
+                pass
+
+    except Exceoption as e:
+        #if an error occurs here, it's probably something to do with the
+        #error archive. this is one of two except functions that won't call
+        #log_error, since it would try to reference a bad file.
+        print(bcolors.BADRED, end='')
+        print('setup error: error while setting up errorarchive file.', end='')
         print(type(e), '\t\"', e, '\"', end='')
         print(bcolors.ENDC)
         exit()
@@ -226,6 +264,26 @@ def open_webdriver():
         log_error(e)
         exit()
 
+#------------------------------------------------------------------------------
+#webdriver function
+#takes no arguments, closes driver, and returns an int detailing its status.
+#if at any time the webdriver shuts down unexpectedly, this will handle any
+#errors associated with it.
+def close_webdriver():
+    try:
+        driver.close()
+        return 0
+        #return 0 on successful close
+
+    except WebDriverException:
+        #the driver was already dead.
+        return -1
+    except Exception as e:
+        #something went wrong, abort the program.
+        print(bcolors.BADRED + 'close_webdriver error' + bcolors.ENDC)
+        log_error(e)
+        exit()
+
 #==============================================================================
 #BEYOND THIS POINT, THE WEBDRIVER IS ACTIVE.
 #ERROR HANDLERS MUST CLOSE THE DRIVER BEFORE EXITING THE PROGRAM.
@@ -247,7 +305,7 @@ def get_username():
         #if something went wrong here, they're not logged in
         print(bcolors.BADRED + 'get_username error' + bcolors.ENDC)
         log_error(e)
-        driver.close()
+        close_webdriver()
         exit()
 
 #------------------------------------------------------------------------------
@@ -266,7 +324,7 @@ def get_password():
         #if something went wrong here, they're not logged in
         print(bcolors.BADRED + 'get_password error' + bcolors.ENDC)
         log_error(e)
-        driver.close()
+        close_webdriver()
         exit()
 
 #------------------------------------------------------------------------------
@@ -285,7 +343,7 @@ def get_dev_url():
         #if something went wrong here, they're not logged in
         print(bcolors.BADRED + 'get_dev_url error' + bcolors.ENDC)
         log_error(e)
-        driver.close()
+        close_webdriver()
         exit()
 
 #------------------------------------------------------------------------------
@@ -305,7 +363,7 @@ def login():
     except Exception as e:
         print(bcolors.BADRED + 'login error' + bcolors.ENDC)
         log_error(e)
-        driver.close()
+        close_webdriver()
         exit()
 
 #------------------------------------------------------------------------------
@@ -367,7 +425,30 @@ def login_send_keys(uname, pword):
     except Exception as e:
         print(bcolors.BADRED + 'login_send_keys error' + bcolors.ENDC)
         log_error(e)
-        driver.close()
+        close_webdriver()
+        exit()
+
+#------------------------------------------------------------------------------
+#logout function
+#takes no arguments, modifies the driver, and closes the program
+def logout():
+    try:
+        driver.get('https://www.deviantart.com/settings/sessions')
+        logout_button = driver.find_element_by_class_name \
+        ('logout-current')
+        logout_button.click()
+        print(bcolors.GOODGREEN + 'logged out.')
+
+        print('exiting.' + bcolors.ENDC)
+        #all clear
+        close_webdriver()
+        exit()
+
+    except Exception as e:
+        #something went wrong
+        print(bcolors.BADRED + 'logout error' + bcolors.ENDC)
+        log_error(e)
+        close_webdriver()
         exit()
 
 #==============================================================================
@@ -544,29 +625,6 @@ def handle_group_error():
         log_error(e)
         logout()
 
-#------------------------------------------------------------------------------
-#logout function
-#takes no arguments, modifies the driver, and closes the program
-def logout():
-    try:
-        driver.get('https://www.deviantart.com/settings/sessions')
-        logout_button = driver.find_element_by_class_name \
-        ('logout-current')
-        logout_button.click()
-        print(bcolors.GOODGREEN + 'logged out.')
-
-        print('exiting.' + bcolors.ENDC)
-        #all clear
-        driver.close()
-        exit()
-
-    except Exception as e:
-        #something went wrong
-        print(bcolors.BADRED + 'logout error' + bcolors.ENDC)
-        log_error(e)
-        driver.close()
-        exit()
-
 #==============================================================================
 #main function
 
@@ -584,6 +642,10 @@ csv_file_name = get_csv_file()
 global driver
 driver = open_webdriver()
 #declared explicitly as global so any function can close it
+
+sleep(10)
+close_webdriver()
+exit()
 
 login()
 
