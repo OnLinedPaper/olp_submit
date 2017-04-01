@@ -204,20 +204,21 @@ def setup():
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+    #no longer appears necessary; keeping around for archive purposes
 
-    try:
-        if not os.path.isfile('./data/chromedriver') \
-        and not os.path.isfile('C:\Windows\chromedriver.exe'):
-            #the driver isn't installed
-            print(bcolors.WARNYELLOW, end='')
-            print('alert: chromedriver is not installed.' + bcolors.ENDC)
-            exit()
+    #try:
+    #    if not os.path.isfile('./data/chromedriver') \
+    #    and not os.path.isfile('C:\Windows\chromedriver.exe'):
+    #        #the driver isn't installed
+    #        print(bcolors.WARNYELLOW, end='')
+    #        print('alert: chromedriver is not installed.' + bcolors.ENDC)
+    #        exit()
 
-    except Exception as e:
-        print(bcolors.BADRED + 'setup error: error while looking for driver' \
-        + bcolors.ENDC)
-        log_error(e)
-        exit()
+    #except Exception as e:
+    #    print(bcolors.BADRED + 'setup error: error while looking for driver' \
+    #    + bcolors.ENDC)
+    #    log_error(e)
+    #    exit()
 
 #------------------------------------------------------------------------------
 #csv file function
@@ -242,7 +243,7 @@ def get_csv_file():
             csv_file_name += '.csv'
             #construct the file name
             #the while loop will now check to make sure it exists
-            return csv_file_name
+        return csv_file_name
 
     except Exception as e:
         #the driver is not open
@@ -642,10 +643,6 @@ csv_file_name = get_csv_file()
 global driver
 driver = open_webdriver()
 #declared explicitly as global so any function can close it
-
-sleep(10)
-close_webdriver()
-exit()
 
 login()
 

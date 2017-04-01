@@ -11,42 +11,42 @@ deviantART faster. the programs use the Selenium automated testing libraries
 to control a browser window, automating the submission process.
 
 
-run olp_group_read first to get a list of all groups you are a part of.
+run group_read first to get a list of all groups you are a part of.
 (the list this creates can be passed to olp_submit)
 
-run olp_list_make next to make specific lists for different types of art.
+run list_make next to make specific lists for different types of art.
 
-run olp_submit last to begin the automated submission process.
+run submit last to begin the automated submission process.
 
 ===============================================================================
 
 GENERAL USAGE NOTES
 
 - V3 IS STILL UNDER CONSTRUCTION. PLEASE USE V2.
-- use olp_group_read.py to make a list of groups, olp_list_make to create
-  specialized lists for different art types, and olp_submit to submit things
+- use group_read.py to make a list of groups, list_make to create
+  specialized lists for different art types, and submit to submit things
   to dA.
 - please don't try to break the program. you will probably succeed. (if you
   ignore this and do manage to break the program, though, please send me a copy
-  of the .errorlog.txt file so I can see what went wrong. It'll be in /data
-  [but be careful, it resets every time you run the program])
-- once you start using olp_submit.py, the main submission program, don't stop
+  of the .errorarchive.txt file so I can fix what went wrong. It'll be in the
+  data folder)
+- once you start using submit_v2.py, the main submission program, don't stop
   until execution is completed - it can't save your progress yet.
 
 ===============================================================================
 
-INSTRUCTIONS FOR olp_group_read.py
+INSTRUCTIONS FOR group_read.py
 
-olp_group_read will go to your groups page and compile all groups into a .csv
-file.
+group_read will go to your groups page and compile all groups into a .csv
+file called groups.csv
 
 - enter your username. that's it.
 
 ===============================================================================
 
-INSTRUCTIONS FOR olp_list_make
+INSTRUCTIONS FOR list_make
 
-olp_list_make allows you to create custom lists to submit art of specific types
+list_make allows you to create custom lists to submit art of specific types
 to specific groups, into specific folders.
 
 - enter your username.
@@ -70,16 +70,16 @@ at the folder selection field, you can...
 
 ===============================================================================
 
-INSTRUCTIONS FOR olp_submit_2
+INSTRUCTIONS FOR submit_v2
 
-olp_submit_2 will largely automate the process of submitting a deviation to dA
+submit_v2 will largely automate the process of submitting a deviation to dA
 groups.
 
 - enter your username.
 - enter your password. (this data is deleted when you close the program.)
 - enter the URL of the deviation you want to submit to groups.
 - enter the name of the list you want to use.
-- enter any keywords you want to use, for the same reason as in olp_list_make.
+- enter any keywords you want to use, for the same reason as in list_make.
 - wait for automated submission to finish.
 - manually submit other deviations.
 
