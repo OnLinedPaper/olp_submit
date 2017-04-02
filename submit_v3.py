@@ -57,13 +57,13 @@ class bcolors:
 #to stdout
 def log_error(e):
     try:
-        with open('./data/.errorlog.txt', 'a') as elog:
+        with open('./.sys/.errorlog.txt', 'a') as elog:
             #write error to file
             errordate = str(datetime.datetime.now()) + '\n\n'
             elog.write(errordate)
             elog.write(traceback.format_exc())
 
-        with open('./data/.errorarchive.txt', 'a') as earc:
+        with open('./.sys/.errorarchive.txt', 'a') as earc:
             #write the error to archive
             errordate = str(datetime.datetime.now()) + '\n\n'
             earc.write(errordate)
@@ -114,8 +114,24 @@ def setup():
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
     try:
+        #ensure the .sys folder is created
+        if not (os.path.exists('.sys')):
+            #sys folder does not exist
+            os.makedirs('.sys')
+
+    except Exception as e:
+        #i don't anticipate an error ever occuring here
+        print(bcolors.BADRED, end='')
+        print('setup error: error while checking for .sys folder.', end='')
+        print(type(e), '\t\"', e, '\"', end='')
+        print(bcolors.ENDC)
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
+    try:
         #set up error log file
-        errorlog = './data/.errorlog.txt'
+        errorlog = './.sys/.errorlog.txt'
         #store name for easier use
         if os.path.isfile(errorlog):
             #if there's an error log, delete it
@@ -138,7 +154,7 @@ def setup():
 
     try:
         #set up permanent error archive file
-        errorrec = './data/.errorarchive.txt'
+        errorrec = './.sys/.errorarchive.txt'
         #store the name for easier use
         if not os.path.isfile(errorrec):
             #if there is not an error archive, make one
@@ -159,7 +175,7 @@ def setup():
 
     try:
         #set up the replacement file
-        replacefile = './data/.replace.csv'
+        replacefile = './.sys/.replace.csv'
         #store the name for easier use
         if os.path.isfile(replacefile):
             #if there's a preexisting replace file
@@ -181,16 +197,41 @@ def setup():
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
     try:
-        #set up the "deal with this later" file
-        laterfile = './data/.later.csv'
+        #set up the "ask about this later" file
+        askfile = './.sys/.ask.csv'
         #store the name for easier use
-        if os.path.isfile(laterfile):
+        if os.path.isfile(askfile):
             #if a file already exists
             pass
         else:
             #we need to create a file
-            with open(laterfile, 'a') as newfile:
-                #create a file for the later csv
+            with open(askfile, 'a') as newfile:
+                #create a file for the ask csv
+                writer = csv.DictWriter(newfile, fieldnames=fieldnames)
+                #writer
+                writer.writeheader()
+                #write the header
+
+    except Exception as e:
+        print(bcolors.BADRED + \
+        'setup error: error while setting up ask later file.' +
+        bcolors.ENDC)
+        log_error(e)
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
+    try:
+        #set up the "submit errors" file
+        serrorfile = './.sys/.submiterror.csv'
+        #store the name for easier use
+        if os.path.isfile(serrorfile):
+            #if a file already exists
+            pass
+        else:
+            #we need to create a file
+            with open(serrorfile, 'a') as newfile:
+                #create a file for the ask csv
                 writer = csv.DictWriter(newfile, fieldnames=fieldnames)
                 #writer
                 writer.writeheader()
@@ -202,23 +243,6 @@ def setup():
         bcolors.ENDC)
         log_error(e)
         exit()
-
-    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
-    #no longer appears necessary; keeping around for archive purposes
-
-    #try:
-    #    if not os.path.isfile('./data/chromedriver') \
-    #    and not os.path.isfile('C:\Windows\chromedriver.exe'):
-    #        #the driver isn't installed
-    #        print(bcolors.WARNYELLOW, end='')
-    #        print('alert: chromedriver is not installed.' + bcolors.ENDC)
-    #        exit()
-
-    #except Exception as e:
-    #    print(bcolors.BADRED + 'setup error: error while looking for driver' \
-    #    + bcolors.ENDC)
-    #    log_error(e)
-    #    exit()
 
 #------------------------------------------------------------------------------
 #csv file function
@@ -246,10 +270,94 @@ def get_csv_file():
         return csv_file_name
 
     except Exception as e:
-        #the driver is not open
         print(bcolors.BADRED + 'get_csv_file error' + bcolors.ENDC)
         log_error(e)
         exit()
+
+#------------------------------------------------------------------------------
+#csv file function
+#takes a csv file name, returns nothing
+#(will exit program if corruption is detected)
+def check_csv_corruption(file):
+    try:
+        i = 0
+        #group number
+        corrupt = False
+
+        with open(csv_file_name) as csvfile:
+            #open the file to be checked
+            reader = csv.DictReader(csvfile)
+            #get a reader
+            for row in reader:
+                #check each row
+                if(check_row_corruption(row)):
+                    #corrupted
+                    print(bcolors.SRSYELLOW, end='')
+                    print('warning: corruption detected in group', i, "\n >", \
+                    check_row_corruption(row), end='')
+                    print(bcolors.ENDC)
+                    corrupt = True
+                i = i+1
+
+        if(corrupt):
+            print(bcolors.WARNYELLOW, end='')
+            print('\nplease fix corrupted row(s) before continuing\n(exiting)', \
+            end='')
+            print(bcolors.ENDC)
+            exit()
+        else:
+            return
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_csv_file error' + bcolors.ENDC)
+        log_error(e)
+        exit()
+
+#------------------------------------------------------------------------------
+#csv file sub-function
+#takes a row, changes nothing
+#returns empty string if row is not corrupt, error message if it is
+def check_row_corruption(row):
+    try:
+        #check to see if any fields are empty
+        #empty folder_name will not actually crash the program, but it's still
+        #checked for good practice
+        if not(row['group_name']):
+            return 'corruption detected: group_name does not exist'
+        elif not(row['folder_name']):
+            return 'corruption detected: folder_name does not exist'
+        elif not(row['folder_value']):
+            return 'corruption detected: folder_value does not exist'
+
+        #make sure folder value is a number
+        int(row['folder_value'])
+
+        #all tests passed
+        return ''
+
+    except ValueError:
+        #folder value was not a number
+        return 'corruption detected: folder_value is not a number'
+    except Exception as e:
+        print(bcolors.BADRED + 'check_row_corruption error' + bcolors.ENDC)
+        log_error(e)
+        exit()
+
+#------------------------------------------------------------------------------
+def write_a_row(row, filename):
+    try:
+        #add the row to the file
+        with open(filename, 'a') as csvfile:
+            #open file for writing
+            writer = csv.writer(csvfile, delimiter=',')
+            #get a writer
+            writer.writerow(row)
+        return
+    except Exception as e:
+        print(bcolors.BADRED + 'write_a_row error' + bcolors.ENDC)
+        log_error(e)
+        exit()
+
 
 #------------------------------------------------------------------------------
 #webdriver function
@@ -491,6 +599,28 @@ def handle_group_error():
         logout()
 
 #------------------------------------------------------------------------------
+#submission sub-function
+#takes nothing, modifies nothing, returns a string containing a message
+#gets a success message when a group is successfully submitted to
+#returns an empry string otherwise
+def get_success_message():
+    try:
+        success_status = modal_box \
+        .find_element_by_class_name('success_message')
+        #get the success message box.
+        if(success_status.get_attribute('style') == 'display: block;'):
+            #the success message is showing. return the text of the message.
+            return(str(success_status.find_element_by_tag_name('span').text))
+        else:
+            #the success message is not showing.
+            return ''
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_success_message error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
+#------------------------------------------------------------------------------
 #navigation function
 #takes a string with the page address, moves webdriver to the deviation page,
 #and returns nothing
@@ -659,50 +789,150 @@ def get_folder_options():
         log_error(e)
         logout()
 
+#------------------------------------------------------------------------------
+#sutomated submission function
+#takes a row, submits it with driver, returns nothing
+#ignores rows that should be ignored, adds rows to a file if they should be
+#asked about later, and submits others.
+def process_row(row):
+    try:
+        g_name = row['group_name']
+        f_name = row['folder_name']
+        f_val = int(row['folder_value'])
+        #save these for ease of use
+
+        if(f_val == -1):
+            #not used
+            return
+        elif(f_val == -2):
+            #add to .ask.csv
+            write_a_row('./.sys/.ask.csv', row)
+            submitasks = submitasks + 1
+        else:
+            submit_to_folder(row)
+
+    except Exception as e:
+        print(bcolors.BADRED + 'process_row error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
+#------------------------------------------------------------------------------
+def submit_to_folder(row):
+    try:
+        send_error = send_group_name(row['group_name'])
+        #send the group name. if it got an error, handle it.
+
+        if not error:
+            #get the folder, click it, and submit
+            folderoptions = get_folder_options()
+            #get the folders
+
+            for option in folderoptions:
+                #iterate through all folders, trying to find the right one
+                if(int(option.get_attribute(value)) == \
+                int(row['folder_value'])):
+                    #a matching value was found
+                    option.click()
+
+                    #find the submit button and click it
+                    modal_box.find_element_by_class_name('submit').click()
+
+                    #wait for a message to show up
+                    #this happens when the option box goes away
+                    element_present = EC.invisibility_of_element_located \
+                    ((By.CLASS_NAME, 'option_2_box'))
+                    WebDriverWait(driver, delay).until(element_present)
+
+                    #get the message
+                    message = ''
+                    message = get_success_message()
+
+                    if not message:
+                        #message was empty, it returned an error
+                        print(bcolors.WARNYELLOW + message + bcolors.ENDC)
+                        submiterrors = submiterrors + 1
+
+                        #add to error file to process later
+                        write_a_row('./.sys/.submiterror.csv', row)
+
+                        return
+                    else:
+                        #success!
+                        print(bcolors.GOODGREEN + message + bcolros.ENDC)
+                        submitsuccesses = submitsuccesses + 1
+
+                        return
+            #if we reached this point, we went through all the folders but
+            #couldn't find the one we were looking for
+            #print an error and add it to the list
+            message = '(could not find specified folder.)'
+            print(bcolors.WARNYELLOW + message + bcolors.ENDC)
+            submiterrors = submiterrors + 1
+
+        else:
+            #there was an error trying to get the group.
+            #print error and do nothing
+            print(bcolors.WARNYELLOW + send_error + bcolors.ENDC)
+            submitfailures = submitfailures + 1
+
+    except Exception as e:
+        print(bcolors.BADRED + 'submit_to_folder error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
 #==============================================================================
 #main function
+if __name__ == "__main__":
 
-do_later = {}
-csv_file_name = ''
-kword = []
+    global submitfailures
+    submitfailures = 0
 
-setup()
-csv_file_name = get_csv_file()
+    global submiterrors
+    submiterrors = 0
 
-global driver
-driver = open_webdriver()
-#declared explicitly as global so any function can close it
+    global submitasks
+    submitasks = 0
 
-login()
+    global submitsuccesses
+    submitsuccesses = 0
 
-get_deviation_page(get_dev_url())
-open_submission_box()
+    setup()
+    #run setup functions
 
-global modal_box
-modal_box = get_modal_box()
-#declared explicitly as global so any function can use it
+    csv_file_name = ''
+    csv_file_name = get_csv_file()
 
-open_manual_submission()
+    check_csv_corruption(csv_file_name)
 
-global entry_field
-entry_field = get_entry_field()
-global check_button
-check_button = get_check_button()
-#declared explicitly as global so any function can use these
+    global driver
+    driver = open_webdriver()
+    #declared explicitly as global so any function can close it
 
-print(send_group_name('proving----grounds'))
-#group that exists
-print(send_group_name('DSGLHLSFHGJDL'))
-#group that doesn't
+    login()
 
-if not send_group_name('proving----grounds'):
-    #ensure successful groups pass an empty string
-    print('pass')
-folder_options = get_folder_options()
-for option in folder_options:
-    #print the folders
-    print(option.text)
+    get_deviation_page(get_dev_url())
+    open_submission_box()
 
-#TODO: delete these
+    global modal_box
+    modal_box = get_modal_box()
+    #declared explicitly as global so any function can use it
 
-logout()
+    open_manual_submission()
+
+    global entry_field
+    entry_field = get_entry_field()
+    global check_button
+    check_button = get_check_button()
+    #declared explicitly as global so any function can use these
+
+    with open(csv_file_name) as csvfile:
+        #open the file
+        reader = csv.DictReader(csvfile)
+        #get a reader
+        for row in reader:
+            #process all rows
+            process_row(row)
+
+    #at this point, automated submissions are complete
+
+    logout()
