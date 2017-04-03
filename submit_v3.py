@@ -93,6 +93,8 @@ def log_error(e):
 #setup function
 #takes no arguments and sets up the external data
 def setup():
+    #TODO: session processing; if some of these folders exist, an active
+    #session may be present
     try:
         #ensure the "data" folder exists
         if not (os.path.exists('data')):
@@ -240,6 +242,31 @@ def setup():
     except Exception as e:
         print(bcolors.BADRED + \
         'setup error: error while setting up error handling file.' +
+        bcolors.ENDC)
+        log_error(e)
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
+    try:
+        #set up the "submit limit" file
+        slimitfile = './.sys/.submitlimit.csv'
+        #store the name for easier use
+        if os.path.isfile(slimitfile):
+            #if a file already exists
+            pass
+        else:
+            #we need to create a file
+            with open(slimitfile, 'a') as newfile:
+                #create a file for the ask csv
+                writer = csv.DictWriter(newfile, fieldnames=fieldnames)
+                #writer
+                writer.writeheader()
+                #write the header
+
+    except Exception as e:
+        print(bcolors.BADRED + \
+        'setup error: error while setting up limit handling file.' +
         bcolors.ENDC)
         log_error(e)
         exit()
@@ -785,7 +812,37 @@ def get_folder_options():
         #return the list of options
 
     except Exception as e:
-        print(bcolors.BADRED + 'get_folder_element error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_folder_options error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
+#------------------------------------------------------------------------------
+def print_folders(folders):
+    try:
+        folder_num = 0
+        for folder in folders:
+            folder_num += 1
+            print('folder', end='')
+
+            #spacing to make it look better
+            if(folder_num < 10):
+                print('   #: ', end='')
+            elif(folder_num < 100):
+                print('  #: ', end='')
+
+            for word in klist:
+                if(word.lower() in folder.text.lower()):
+                    #keyword match
+                    print(bcolors.GOODGREEN + end='')
+            #print each folder name
+            print(folder.text + bcolors.ENDC)
+
+            #extra options
+            print('option # i: (ignore this time)')
+            print('option # r: (remove from list)')
+
+    except Exception as e:
+        print(bcolors.BADRED + 'print_folders error' + bcolors.ENDC)
         log_error(e)
         logout()
 
@@ -796,10 +853,8 @@ def get_folder_options():
 #asked about later, and submits others.
 def process_row(row):
     try:
-        g_name = row['group_name']
-        f_name = row['folder_name']
         f_val = int(row['folder_value'])
-        #save these for ease of use
+        #save this for ease of use
 
         if(f_val == -1):
             #not used
@@ -817,6 +872,8 @@ def process_row(row):
         logout()
 
 #------------------------------------------------------------------------------
+#automated submission function
+#takes a row as argument, submits it to the group, and returns nothing
 def submit_to_folder(row):
     try:
         send_error = send_group_name(row['group_name'])
@@ -831,7 +888,7 @@ def submit_to_folder(row):
                 #iterate through all folders, trying to find the right one
                 if(int(option.get_attribute(value)) == \
                 int(row['folder_value'])):
-                    #a matching value was found
+                    #a matching folder value was found
                     option.click()
 
                     #find the submit button and click it
@@ -849,11 +906,17 @@ def submit_to_folder(row):
 
                     if not message:
                         #message was empty, it returned an error
+                        message = handle_group_error()
                         print(bcolors.WARNYELLOW + message + bcolors.ENDC)
-                        submiterrors = submiterrors + 1
 
-                        #add to error file to process later
-                        write_a_row('./.sys/.submiterror.csv', row)
+                        if 'limit' in message:
+                            #some sort of limit error, these happen a lot
+                            write_a_row('./.sys/.submitlimit.csv', row)
+                            submitlimits = submitlimits + 1
+                        else:
+                            #needs to be addressed
+                            write_a_row('./.sys/.submiterror.csv', row)
+                            submiterrors = submiterrors + 1
 
                         return
                     else:
@@ -880,12 +943,93 @@ def submit_to_folder(row):
         log_error(e)
         logout()
 
+#------------------------------------------------------------------------------
+#manual submission function
+#takes a csv inname and a csv filename as arguments, returns 1 to process, 0 to
+#not process but also not delete, -1 if the file was deleted
+def ask_about_processing(inname, filename):
+    try:
+        name = str(inname)
+        #in case they name it a number (would break print functions)
+        respose = ''
+        while not any(s in response for s in ['y', 'l']):
+            #get them to answer yes or later ('no' means they want to delete)
+            response = input('process', name + '? yes\\no\\later (y\\n\\l): ')
+            if(response == 'y'):
+                return 1
+            elif(response == 'l'):
+                #continue, but don't delete file
+                return 0
+            elif(response == 'n'):
+                #see if they want to delete file
+                response = input('delete', name + '? yes\\no (y\\n): ')
+                if(response == 'y'):
+                    #delete it. if they respond with anything else, it will just
+                    #loop back to the top.
+                    os.remove(filename)
+                    print(bcolors.SRSYELLOW + 'deleted', name + bcolors.ENDC)
+                    return -1
+
+    except Exception as e:
+        print(bcolors.BADRED + 'ask_about_processing error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
+#------------------------------------------------------------------------------
+def get_keywords():
+    try:
+        new_k = input('enter keywords: ')
+        #get their keywords
+        if new_k:
+            #not empty, add keywords
+            new_klist = re.sub('[^\w]', ' ', new_k).split()
+            klist = klist + new_klist
+            print('keywords: ' + bcolors.GOODGREEN)
+            for word in klist:
+                #echo keywords
+                print(word)
+            print(bcolors.ENDC)
+        else:
+            #nothing added
+            print('no keywords added.')
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_keywords error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
+#------------------------------------------------------------------------------
+def manually_process(filename):
+    try:
+        with open(filename) as csvfile:
+            #open the file
+            reader = csv.DictReader(csvfile)
+            #get a reader
+            for row in reader:
+                send_group_name(row['group_name'])
+                #send the group name
+                opt = get_folder_options()
+                #get the options
+
+                print('for group:', row['group_name'])
+                print_folders(opt)
+                #TODO: set up the rest of this
+
+
+    except Exception as e:
+        print(bcolors.BADRED + 'manually_process error' + bcolors.ENDC)
+        log_error(e)
+        logout()
+
 #==============================================================================
 #main function
 if __name__ == "__main__":
 
     global submitfailures
     submitfailures = 0
+
+    global submitlimits
+    submitlimits = 0
 
     global submiterrors
     submiterrors = 0
@@ -934,5 +1078,26 @@ if __name__ == "__main__":
             process_row(row)
 
     #at this point, automated submissions are complete
-    
+    print(bcolors.GOODGREEN + 'automated submissions complete')
+    print(str(submitsuccesses) + ' successful')
+    print(str(submitasks) + ' asks')
+    print(bcolors.WARNYELLOW + str(submitlimits) + ' unsuccessful (limit)')
+    print(bcolors.SRSYELLOW + str(submiterrors) + ' unsuccessful (error)')
+    print(bcolors.BADRED + str(submitfailures) + ' failed' + bcolors.ENDC)
+
+    global klist
+    klist = []
+
+    get_keywords()
+
+    #see if they want to do asks
+    if(int(ask_about_processing('asks', './.sys/.ask.csv')) == 1):
+        #they want to do asks
+        manually_process('./.sys/.ask.csv')
+
+
+
+
+
+
     logout()
