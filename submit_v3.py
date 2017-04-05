@@ -13,6 +13,8 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
 #also used when waiting for stuff to load
 #bunch of selenium things
+import signal
+#to catch CTRL+C
 
 from sys import exit
 #for when things go wrong
@@ -31,12 +33,7 @@ import re
 import datetime
 #misc use, mostly for error logging
 
-global delay
-delay = 4
-#if something takes longer than 4 seconds, something is up
-global fieldnames
-fieldnames = ['group_name', 'folder_name', 'folder_value']
-#these will be used by CSV files
+import vars as v
 
 #==============================================================================
 #class and function definitions
@@ -52,18 +49,22 @@ class bcolors:
     ENDC = '\033[0m'
 
 #------------------------------------------------------------------------------
+def signal_handler(signal, frame):
+    save_and_exit()
+
+#------------------------------------------------------------------------------
 #error logging function
 #takes a string and prints a traceback to an error file, as well as the string
 #to stdout
 def log_error(e):
     try:
-        with open('./.sys/.errorlog.txt', 'a') as elog:
+        with open(v.errorlog, 'a') as elog:
             #write error to file
             errordate = str(datetime.datetime.now()) + '\n\n'
             elog.write(errordate)
             elog.write(traceback.format_exc())
 
-        with open('./.sys/.errorarchive.txt', 'a') as earc:
+        with open(v.errorrec, 'a') as earc:
             #write the error to archive
             errordate = str(datetime.datetime.now()) + '\n\n'
             earc.write(errordate)
@@ -95,6 +96,7 @@ def log_error(e):
 def setup():
     #TODO: session processing; if some of these folders exist, an active
     #session may be present
+
     try:
         #ensure the "data" folder exists
         if not (os.path.exists('data')):
@@ -133,13 +135,10 @@ def setup():
 
     try:
         #set up error log file
-        errorlog = './.sys/.errorlog.txt'
-        #store name for easier use
-        if os.path.isfile(errorlog):
+        if os.path.isfile(v.errorlog):
             #if there's an error log, delete it
-            os.remove(errorlog)
-        with open(errorlog, 'a'):
-            #create a blank file for the errorlog
+            os.remove(v.errorlog)
+        with open(v.errorlog, 'a'):
             pass
 
     except Exception as e:
@@ -156,14 +155,12 @@ def setup():
 
     try:
         #set up permanent error archive file
-        errorrec = './.sys/.errorarchive.txt'
-        #store the name for easier use
-        if not os.path.isfile(errorrec):
+        if not os.path.isfile(v.errorrec):
             #if there is not an error archive, make one
-            with open(errorrec, 'a'):
+            with open(v.errorrec, 'a'):
                 pass
 
-    except Exceoption as e:
+    except Exception as e:
         #if an error occurs here, it's probably something to do with the
         #error archive. this is one of two except functions that won't call
         #log_error, since it would try to reference a bad file.
@@ -174,24 +171,86 @@ def setup():
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+    try:
+        #set up save file
+        if not os.path.isfile(v.savefile):
+            #if there is not an error archive, make one
+            with open(v.savefile, 'a'):
+                pass
+        else:
+            #a save file exists.
+            choice = ''
+            print(bcolors.GOODGREEN, end='')
+            choice = input \
+            ('a save file has been detected. use/delete/quit (u/d/q): ')
+            print(bcolors.ENDC, end='')
+            #get their choice.
+            if(choice == 'u'):
+                #use the save file
+                pass
+            elif(choice == 'd'):
+                message = 'WARNING: this will delete save file.'
+                message = message + ' are you sure? yes/no (y/n): '
+
+                print(bcolors.SRSYELLOW, end='')
+                choice = input(message)
+                print(bcolors.ENDC, end='')
+
+                if(choice == 'y'):
+                    #wipe everything
+                    try:
+                        os.remove(v.askfile)
+                    except:
+                        pass
+                    try:
+                        os.remove(v.replacefile)
+                    except:
+                        pass
+                    try:
+                        os.remove(v.slimitfile)
+                    except:
+                        pass
+                    try:
+                        os.remove(v.serrorfile)
+                    except:
+                        pass
+                    try:
+                        os.remove(v.savefile)
+                    except:
+                        pass
+
+                    with open(v.savefile, 'a'):
+                        pass
+            else:
+                #exit the program
+                exit()
+
+
+    except Exception as e:
+        #if an error occurs here, it's probably something to do with the
+        #error archive. this is one of two except functions that won't call
+        #log_error, since it would try to reference a bad file.
+        print(bcolors.BADRED, end='')
+        print('setup error: error while setting up save file.' + bcolors.ENDC)
+        log_error(e)
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
     try:
         #set up the replacement file
-        replacefile = './.sys/.replace.csv'
-        #store the name for easier use
-        if os.path.isfile(replacefile):
-            #if there's a preexisting replace file
-            os.remove(replacefile)
-        with open(replacefile, 'a') as newfile:
-            #create a file for the replace csv
-            writer = csv.DictWriter(newfile, fieldnames=fieldnames)
-            #writer
-            writer.writeheader()
-            #write the header
+        if not os.path.isfile(v.replacefile):
+            #if there's not a preexisting replace file
+            with open(v.replacefile, 'a') as newfile:
+                #create a file for the replace csv
+                writer = csv.DictWriter(newfile, fieldnames=v.fieldnames)
+                #writer
+                writer.writeheader()
+                #write the header
 
     except Exception as e:
         print(bcolors.BADRED + \
-        'setup error: error while setting up replace file.' +
+        'setup error: error while setting up replace file.' + \
         bcolors.ENDC)
         log_error(e)
         exit()
@@ -200,23 +259,19 @@ def setup():
 
     try:
         #set up the "ask about this later" file
-        askfile = './.sys/.ask.csv'
-        #store the name for easier use
-        if os.path.isfile(askfile):
-            #if a file already exists
-            pass
-        else:
+        if not os.path.isfile(v.askfile):
+            #if a file does not already exist
             #we need to create a file
-            with open(askfile, 'a') as newfile:
+            with open(v.askfile, 'a') as newfile:
                 #create a file for the ask csv
-                writer = csv.DictWriter(newfile, fieldnames=fieldnames)
+                writer = csv.DictWriter(newfile, fieldnames=v.fieldnames)
                 #writer
                 writer.writeheader()
                 #write the header
 
     except Exception as e:
         print(bcolors.BADRED + \
-        'setup error: error while setting up ask later file.' +
+        'setup error: error while setting up ask later file.' + \
         bcolors.ENDC)
         log_error(e)
         exit()
@@ -225,23 +280,19 @@ def setup():
 
     try:
         #set up the "submit errors" file
-        serrorfile = './.sys/.submiterror.csv'
-        #store the name for easier use
-        if os.path.isfile(serrorfile):
-            #if a file already exists
-            pass
-        else:
+        if not os.path.isfile(v.serrorfile):
+            #if a file does not exist
             #we need to create a file
-            with open(serrorfile, 'a') as newfile:
+            with open(v.serrorfile, 'a') as newfile:
                 #create a file for the ask csv
-                writer = csv.DictWriter(newfile, fieldnames=fieldnames)
+                writer = csv.DictWriter(newfile, fieldnames=v.fieldnames)
                 #writer
                 writer.writeheader()
                 #write the header
 
     except Exception as e:
         print(bcolors.BADRED + \
-        'setup error: error while setting up error handling file.' +
+        'setup error: error while setting up error handling file.' + \
         bcolors.ENDC)
         log_error(e)
         exit()
@@ -250,23 +301,19 @@ def setup():
 
     try:
         #set up the "submit limit" file
-        slimitfile = './.sys/.submitlimit.csv'
-        #store the name for easier use
-        if os.path.isfile(slimitfile):
-            #if a file already exists
-            pass
-        else:
+        if not os.path.isfile(v.slimitfile):
+            #if a file does not yet exist
             #we need to create a file
-            with open(slimitfile, 'a') as newfile:
+            with open(v.slimitfile, 'a') as newfile:
                 #create a file for the ask csv
-                writer = csv.DictWriter(newfile, fieldnames=fieldnames)
+                writer = csv.DictWriter(newfile, fieldnames=v.fieldnames)
                 #writer
                 writer.writeheader()
                 #write the header
 
     except Exception as e:
         print(bcolors.BADRED + \
-        'setup error: error while setting up limit handling file.' +
+        'setup error: error while setting up limit handling file.' + \
         bcolors.ENDC)
         log_error(e)
         exit()
@@ -371,7 +418,7 @@ def check_row_corruption(row):
         exit()
 
 #------------------------------------------------------------------------------
-def write_a_row(row, filename):
+def write_a_row(filename, row):
     try:
         #add the row to the file
         with open(filename, 'a') as csvfile:
@@ -380,11 +427,11 @@ def write_a_row(row, filename):
             #get a writer
             writer.writerow(row)
         return
+
     except Exception as e:
         print(bcolors.BADRED + 'write_a_row error' + bcolors.ENDC)
         log_error(e)
         exit()
-
 
 #------------------------------------------------------------------------------
 #webdriver function
@@ -407,7 +454,7 @@ def open_webdriver():
 #errors associated with it.
 def close_webdriver():
     try:
-        driver.close()
+        v.drivr.close()
         return 0
         #return 0 on successful close
 
@@ -487,7 +534,7 @@ def get_dev_url():
 #takes no arguments, modifies driver, and returns nothing
 def login():
     try:
-        while('deviantart.com/browse/all/' not in driver.current_url):
+        while('deviantart.com/browse/all/' not in v.drivr.current_url):
             #repeat until they log in successfully
             #(it goes to that url when they log in)
             login_not_me()
@@ -508,7 +555,7 @@ def login_not_me():
     try:
         #if they entered an existing uname, go back to the
         #original entry page
-        not_me = driver.find_element_by_class_name \
+        not_me = v.drivr.find_element_by_class_name \
         ('login-not-me')
         #if they entered a valid username
         not_me = not_me.find_element_by_class_name \
@@ -527,9 +574,9 @@ def login_not_me():
 #returns nothing.
 def login_send_keys(uname, pword):
     try:
-        driver.get('https://www.deviantart.com/users/login')
+        v.drivr.get('https://www.deviantart.com/users/login')
         #go to the login page
-        login_elem = driver.find_element_by_id \
+        login_elem = v.drivr.find_element_by_id \
         ('login_username')
         #go to the username field
         login_elem.clear()
@@ -537,7 +584,7 @@ def login_send_keys(uname, pword):
         login_elem.send_keys(uname)
         #put in username
 
-        login_elem = driver.find_element_by_id \
+        login_elem = v.drivr.find_element_by_id \
         ('login_password')
         #go to password field
         login_elem.clear()
@@ -545,13 +592,13 @@ def login_send_keys(uname, pword):
         login_elem.send_keys(pword)
         #put in password
 
-        login_elem = driver.find_element_by_id \
+        login_elem = v.drivr.find_element_by_id \
         ('remember_me')
         #go to "remember me" checkbox
         login_elem.click()
         #uncheck it
 
-        login_elem = driver.find_element_by_class_name \
+        login_elem = v.drivr.find_element_by_class_name \
         ('smbutton')
         #go to login button
         login_elem.click()
@@ -568,8 +615,8 @@ def login_send_keys(uname, pword):
 #takes no arguments, modifies the driver, and closes the program
 def logout():
     try:
-        driver.get('https://www.deviantart.com/settings/sessions')
-        logout_button = driver.find_element_by_class_name \
+        v.drivr.get('https://www.deviantart.com/settings/sessions')
+        logout_button = v.drivr.find_element_by_class_name \
         ('logout-current')
         logout_button.click()
         print(bcolors.GOODGREEN + 'logged out.')
@@ -609,7 +656,7 @@ def logout():
 #that don't exist, can't be submitted to, or already include this deviation
 def handle_group_error():
     try:
-        error_status = modal_box.find_element_by_class_name('error_message')
+        error_status = v.modal_box.find_element_by_class_name('error_message')
         #get the error message box.
         if(error_status.get_attribute('style') == 'display: block;'):
             #the error message is showing. return the text of the message.
@@ -623,7 +670,7 @@ def handle_group_error():
     except Exception as e:
         print(bcolors.BADRED + 'handle_group_error error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #submission sub-function
@@ -632,7 +679,8 @@ def handle_group_error():
 #returns an empry string otherwise
 def get_success_message():
     try:
-        success_status = modal_box \
+        sleep(1)
+        success_status = v.modal_box \
         .find_element_by_class_name('success_message')
         #get the success message box.
         if(success_status.get_attribute('style') == 'display: block;'):
@@ -645,7 +693,7 @@ def get_success_message():
     except Exception as e:
         print(bcolors.BADRED + 'get_success_message error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #navigation function
@@ -653,13 +701,13 @@ def get_success_message():
 #and returns nothing
 def get_deviation_page(dpage):
     try:
-        driver.get(str(dpage))
+        v.drivr.get(str(dpage))
         #this tends to delay until the page is fully loaded
 
     except Exception as e:
         print(bcolors.BADRED + 'get_deviation_page error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #setup function
@@ -667,7 +715,7 @@ def get_deviation_page(dpage):
 def open_submission_box():
     try:
         #see if we can find the submit button
-        add_button = driver.find_element_by_id \
+        add_button = v.drivr.find_element_by_id \
         ('groups_links')
         #go to the element that holds the button
         add_button = add_button.find_element_by_class_name \
@@ -679,41 +727,41 @@ def open_submission_box():
         #verify the box opened
         element_present = EC.presence_of_element_located \
         ((By.ID, 'manual_input'))
-        WebDriverWait(driver, delay).until(element_present)
+        WebDriverWait(v.drivr, v.delay).until(element_present)
         #give the popup a delay of up to four seconds to load
 
-    except TimeooutException as e:
+    except TimeoutException as e:
         print(bcolors.BADRED, end='')
         print('open_submission_box error: ', \
         'the submission popup took too long to load, or could not be found.', \
         end='')
         print(bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
     except Exception as e:
         print(bcolors.BADRED + 'open_submission_box error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #setup function
 #takes no arguments, modifies nothing, returns the modal box
 def get_modal_box():
     try:
-        return driver.find_element_by_id('modalspace')
+        return v.drivr.find_element_by_id('modalspace')
         #find the popup box
 
     except Exception as e:
-        print(bcolors.BADRED + 'get_modal_box error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_v.modal_box error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #setup function
 #takes no arguments, modifies webdriver, returns nothing
 def open_manual_submission():
     try:
-        manual_button = modal_box.find_element_by_id \
+        manual_button = v.modal_box.find_element_by_id \
         ('manual_input')
         #find the manual input button
         manual_button.click()
@@ -721,70 +769,70 @@ def open_manual_submission():
 
         element_present = EC.presence_of_element_located \
         ((By.ID, 'groupname-search'))
-        WebDriverWait(driver, delay).until(element_present)
+        WebDriverWait(v.drivr, v.delay).until(element_present)
         #give the entry box a delay of up to four seconds to load
 
     except Exception as e:
         print(bcolors.BADRED + 'open_submission_box error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #setup function
 #takes no arguments, returns an element to the text entry field
 def get_entry_field():
     try:
-        return modal_box.find_element_by_id('groupname-search')
+        return v.modal_box.find_element_by_id('groupname-search')
 
     except TimeoutException as e:
         print(bcolors.BADRED, end='')
-        print('get_entry_field error: ', \
+        print('get_v.entry_field error: ', \
         'the text entry box took too long to load or could not be found.', \
         end='')
         print(bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
     except Exception as e:
-        print(bcolors.BADRED + 'get_entry_field error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_v.entry_field error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #setup function
 #takes no arguments, returns an element to the text entry field
 def get_check_button():
     try:
-        return modal_box.find_element_by_id('groupname-check')
+        return v.modal_box.find_element_by_id('groupname-check')
 
     except TimeoutException as e:
         print(bcolors.BADRED, end='')
-        print('get_check_button error: ', \
+        print('get_v.check_button error: ', \
         'the check button took too long to load or could not be found.', \
         end='')
         print(bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
     except Exception as e:
-        print(bcolors.BADRED + 'get_check_button error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_v.check_button error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #submission function
-#takes a group name, modifies driver by using entry_field and check_button,
+#takes a group name, modifies driver by using v.entry_field and v.check_button,
 #returns nothing on success, error message on failure
 def send_group_name(name):
     try:
-        entry_field.clear()
+        v.entry_field.clear()
         #clear any leftover input away
-        entry_field.send_keys(name)
+        v.entry_field.send_keys(name)
         #send the group name
-        check_button.click()
+        v.check_button.click()
         #submit it
 
         element_present = EC.visibility_of_element_located \
         ((By.CLASS_NAME, 'selected_group_info'))
-        WebDriverWait(driver, delay).until(element_present)
+        WebDriverWait(v.drivr, v.delay).until(element_present)
 
         #the group info appeared; we can continue
         return ''
@@ -796,7 +844,7 @@ def send_group_name(name):
     except Exception as e:
         print(bcolors.BADRED + 'send_group_name error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #submission function
@@ -804,7 +852,7 @@ def send_group_name(name):
 #folders available for this gallery
 def get_folder_options():
     try:
-        folder_element = modal_box.find_element_by_id('gallery_selection')
+        folder_element = v.modal_box.find_element_by_id('gallery_selection')
         #find the selection box
         f_options = folder_element.find_elements_by_tag_name('option')
         #get the folder options, in list form
@@ -814,37 +862,46 @@ def get_folder_options():
     except Exception as e:
         print(bcolors.BADRED + 'get_folder_options error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
+#submission function
+#takes a list of folders, prints folders out with keywords highlighted, and
+#returns the number of folders printed.
 def print_folders(folders):
     try:
         folder_num = 0
+        print('\nuse which folder?')
         for folder in folders:
             folder_num += 1
             print('folder', end='')
 
             #spacing to make it look better
             if(folder_num < 10):
-                print('   #: ', end='')
+                print('   #', end='')
             elif(folder_num < 100):
-                print('  #: ', end='')
+                print('  #', end='')
+            print(str(folder_num) + ': ', end='')
 
-            for word in klist:
+            for word in v.klist:
                 if(word.lower() in folder.text.lower()):
                     #keyword match
-                    print(bcolors.GOODGREEN + end='')
+                    print(bcolors.GOODGREEN, end='')
             #print each folder name
             print(folder.text + bcolors.ENDC)
 
-            #extra options
-            print('option # i: (ignore this time)')
-            print('option # r: (remove from list)')
+        #extra options
+        print('option # i: (ignore group this time)')
+        print('option # s: (stop using this group)')
+        print('option # a: (ask in the future)')
+
+        return folder_num
+        #so that we can check to see if the folder is in bounds
 
     except Exception as e:
         print(bcolors.BADRED + 'print_folders error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #sutomated submission function
@@ -853,6 +910,9 @@ def print_folders(folders):
 #asked about later, and submits others.
 def process_row(row):
     try:
+        v.activegroup = row['group_name']
+        #in case we have to save and exit
+
         f_val = int(row['folder_value'])
         #save this for ease of use
 
@@ -860,16 +920,28 @@ def process_row(row):
             #not used
             return
         elif(f_val == -2):
-            #add to .ask.csv
-            write_a_row('./.sys/.ask.csv', row)
-            submitasks = submitasks + 1
+            message = ''
+            message = send_group_name(row['group_name'])
+            if not message:
+                #no error was showing; we can ask the user
+                #add to .ask.csv
+                write_me = [row['group_name'], \
+                row['folder_name'], row['folder_value']]
+                write_a_row(v.askfile, write_me)
+                print(bcolors.GOODGREEN + \
+                'asking after automated submissions complete' + bcolors.ENDC)
+                v.submitasks = v.submitasks + 1
+            else:
+                print('\ngroup:', row['group_name'])
+                print(bcolors.WARNYELLOW + message + bcolors.ENDC)
+                v.submitfailures = v.submitfailures + 1
         else:
             submit_to_folder(row)
 
     except Exception as e:
         print(bcolors.BADRED + 'process_row error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #automated submission function
@@ -879,7 +951,7 @@ def submit_to_folder(row):
         send_error = send_group_name(row['group_name'])
         #send the group name. if it got an error, handle it.
 
-        if not error:
+        if not send_error:
             #get the folder, click it, and submit
             folderoptions = get_folder_options()
             #get the folders
@@ -892,13 +964,13 @@ def submit_to_folder(row):
                     option.click()
 
                     #find the submit button and click it
-                    modal_box.find_element_by_class_name('submit').click()
+                    v.modal_box.find_element_by_class_name('submit').click()
 
                     #wait for a message to show up
                     #this happens when the option box goes away
                     element_present = EC.invisibility_of_element_located \
                     ((By.CLASS_NAME, 'option_2_box'))
-                    WebDriverWait(driver, delay).until(element_present)
+                    WebDriverWait(v.drivr, v.delay).until(element_present)
 
                     #get the message
                     message = ''
@@ -909,20 +981,23 @@ def submit_to_folder(row):
                         message = handle_group_error()
                         print(bcolors.WARNYELLOW + message + bcolors.ENDC)
 
+                        write_me = [row['group_name'], \
+                        row['folder_name'], row['folder_value']]
+
                         if 'limit' in message:
                             #some sort of limit error, these happen a lot
-                            write_a_row('./.sys/.submitlimit.csv', row)
-                            submitlimits = submitlimits + 1
+                            write_a_row(v.slimitfile, write_me)
+                            v.submitlimits = v.submitlimits + 1
                         else:
                             #needs to be addressed
-                            write_a_row('./.sys/.submiterror.csv', row)
-                            submiterrors = submiterrors + 1
+                            write_a_row(v.serrorfile, row)
+                            v.submiterrors = v.submiterrors + 1
 
                         return
                     else:
                         #success!
                         print(bcolors.GOODGREEN + message + bcolros.ENDC)
-                        submitsuccesses = submitsuccesses + 1
+                        v.submitsuccesses = v.submitsuccesses + 1
 
                         return
             #if we reached this point, we went through all the folders but
@@ -930,18 +1005,18 @@ def submit_to_folder(row):
             #print an error and add it to the list
             message = '(could not find specified folder.)'
             print(bcolors.WARNYELLOW + message + bcolors.ENDC)
-            submiterrors = submiterrors + 1
+            v.submiterrors = v.submiterrors + 1
 
         else:
             #there was an error trying to get the group.
             #print error and do nothing
             print(bcolors.WARNYELLOW + send_error + bcolors.ENDC)
-            submitfailures = submitfailures + 1
+            v.submitfailures = v.submitfailures + 1
 
     except Exception as e:
         print(bcolors.BADRED + 'submit_to_folder error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
 #manual submission function
@@ -951,10 +1026,13 @@ def ask_about_processing(inname, filename):
     try:
         name = str(inname)
         #in case they name it a number (would break print functions)
-        respose = ''
+        response = ''
         while not any(s in response for s in ['y', 'l']):
             #get them to answer yes or later ('no' means they want to delete)
-            response = input('process', name + '? yes\\no\\later (y\\n\\l): ')
+            message = 'process '
+            message = message + name
+            message = message + '? yes\\no\\later (y\\n\\l): '
+            response = input(message)
             if(response == 'y'):
                 return 1
             elif(response == 'l'):
@@ -962,7 +1040,10 @@ def ask_about_processing(inname, filename):
                 return 0
             elif(response == 'n'):
                 #see if they want to delete file
-                response = input('delete', name + '? yes\\no (y\\n): ')
+                message = 'delete '
+                message = message + name
+                message = message + '? yes\\no (y\\n): '
+                response = input(message)
                 if(response == 'y'):
                     #delete it. if they respond with anything else, it will just
                     #loop back to the top.
@@ -973,9 +1054,11 @@ def ask_about_processing(inname, filename):
     except Exception as e:
         print(bcolors.BADRED + 'ask_about_processing error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #------------------------------------------------------------------------------
+#takes no arguments, modifies v.klist, and returns nothing
+#gets a string of user entered keywords and adds them to v.klist
 def get_keywords():
     try:
         new_k = input('enter keywords: ')
@@ -983,9 +1066,9 @@ def get_keywords():
         if new_k:
             #not empty, add keywords
             new_klist = re.sub('[^\w]', ' ', new_k).split()
-            klist = klist + new_klist
+            v.klist = v.klist + new_klist
             print('keywords: ' + bcolors.GOODGREEN)
-            for word in klist:
+            for word in v.klist:
                 #echo keywords
                 print(word)
             print(bcolors.ENDC)
@@ -995,6 +1078,24 @@ def get_keywords():
 
     except Exception as e:
         print(bcolors.BADRED + 'get_keywords error' + bcolors.ENDC)
+        log_error(e)
+        save_and_exit()
+
+#------------------------------------------------------------------------------
+#takes no arguments, saves the current state, returns nothing
+def save_and_exit():
+    try:
+        with open(v.savefile, 'a') as v.savefile:
+            #open the file; write the csv file
+            #we were in and the group
+            v.savefile.write(v.activefile)
+            v.savefile.write('\n')
+            v.savefile.write(v.activegroup)
+            #now exit
+            logout()
+
+    except Exception as e:
+        print(bcolors.BADRED + 'save_and_exit error' + bcolors.ENDC)
         log_error(e)
         logout()
 
@@ -1006,39 +1107,120 @@ def manually_process(filename):
             reader = csv.DictReader(csvfile)
             #get a reader
             for row in reader:
-                send_group_name(row['group_name'])
-                #send the group name
-                opt = get_folder_options()
-                #get the options
+                v.activegroup = row['group_name']
+                #for if we have to save and exit
+                error_message = ''
+                error_message = send_group_name(row['group_name'])
+                #make sure this is a valid group
 
-                print('for group:', row['group_name'])
-                print_folders(opt)
-                #TODO: set up the rest of this
+                if not error_message:
+                    #send the group name
+                    opt = get_folder_options()
+                    #get the options
 
+                    print('for group:', row['group_name'])
+                    folder_num = 0
+                    folder_num = print_folders(opt)
+                    #print the folder options
+                    choice = -1
+
+                    while(str(choice) == '-1'):
+                        try:
+                            choice = input('folder #')
+                            if(str(choice) == 'i'):
+                                #ignore it
+                                print('ignored.')
+
+                                choice = -1
+                                break
+                            elif(str(choice) == 's'):
+                                #eliminate it.
+                                write_a_row(v.replacefile, \
+                                [row['group_name'], 'UNUSED', '-1'])
+                                print('group removed.')
+
+                                choice = -1
+                                break
+                            elif(str(choice) == 'a'):
+                                #ask each time in the future.
+                                write_a_row(v.replacefile, \
+                                [row['group_name'], 'ASK', '-2'])
+                                print('asking next time.')
+
+                                choice = -1
+                                break
+                            elif(str(choice) == 'k'):
+                                #get keywords
+                                get_keywords()
+
+                                choice = -1
+                                pass
+                            elif(str(choice) == 'x'):
+                                #save and exit
+                                save_and_exit()
+                            elif(str(choice) == 'p'):
+                                #reprint folder options
+                                print('for group:', row['group_name'])
+                                folder_num = print_folders(opt)
+
+                                choice = -1
+                                pass
+                            elif(int(choice) > folder_num or int(choice) <= 0):
+                                #bad folder number
+                                print('folder out of bounds.')
+
+                                choice = -1
+                                pass
+                            else:
+                                pick = 0
+                                #process this row
+                                for fld in opt:
+                                #find their folder
+                                    pick += 1
+                                    if(int(pick) == int(choice)):
+                                        #it's this folder
+                                        fld.click()
+                                        #find the submit button and click it
+                                        v.modal_box.find_element_by_class_name \
+                                        ('submit').click()
+
+                                        #get the message
+                                        message = ''
+                                        message = get_success_message()
+
+                                        if not message:
+                                            #message was empty,
+                                            #it returned an error
+                                            message = handle_group_error()
+                                            print(bcolors.WARNYELLOW + \
+                                            message + bcolors.ENDC)
+
+                                            #try again
+                                            choice = -1
+                                        else:
+                                            #success!
+                                            print(bcolors.GOODGREEN + \
+                                            message + bcolros.ENDC)
+
+
+                        except ValueError:
+                            #print nothing; just get folder num again
+                            choice = -1
+                else:
+                    print(bcolors.BADRED, end='')
+                    print(error_message, end='')
+                    print(bcolors.ENDC)
 
     except Exception as e:
         print(bcolors.BADRED + 'manually_process error' + bcolors.ENDC)
         log_error(e)
-        logout()
+        save_and_exit()
 
 #==============================================================================
 #main function
 if __name__ == "__main__":
-
-    global submitfailures
-    submitfailures = 0
-
-    global submitlimits
-    submitlimits = 0
-
-    global submiterrors
-    submiterrors = 0
-
-    global submitasks
-    submitasks = 0
-
-    global submitsuccesses
-    submitsuccesses = 0
+    signal.signal(signal.SIGINT, signal_handler)
+    #to catch ctrl-c
 
     setup()
     #run setup functions
@@ -1048,8 +1230,8 @@ if __name__ == "__main__":
 
     check_csv_corruption(csv_file_name)
 
-    global driver
-    driver = open_webdriver()
+
+    v.drivr = open_webdriver()
     #declared explicitly as global so any function can close it
 
     login()
@@ -1057,18 +1239,32 @@ if __name__ == "__main__":
     get_deviation_page(get_dev_url())
     open_submission_box()
 
-    global modal_box
-    modal_box = get_modal_box()
+
+    v.modal_box = get_modal_box()
     #declared explicitly as global so any function can use it
 
     open_manual_submission()
 
-    global entry_field
-    entry_field = get_entry_field()
-    global check_button
-    check_button = get_check_button()
+
+    v.entry_field = get_entry_field()
+
+    v.check_button = get_check_button()
     #declared explicitly as global so any function can use these
 
+
+
+
+    #with open(v.savefile) as s:
+    #    savedata = [x.strip for x in s.readlines()]
+    #    #savedata[0] has filename, savedata[1] has groupname
+    #if(savedata[0]):
+    #    #there is a file in here
+
+    #   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+    #automated submissions
+
+    v.activefile = csv_file_name
+    #for if we need to exit
     with open(csv_file_name) as csvfile:
         #open the file
         reader = csv.DictReader(csvfile)
@@ -1077,23 +1273,40 @@ if __name__ == "__main__":
             #process all rows
             process_row(row)
 
+    #   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+    #manual submissions
+
     #at this point, automated submissions are complete
     print(bcolors.GOODGREEN + 'automated submissions complete')
-    print(str(submitsuccesses) + ' successful')
-    print(str(submitasks) + ' asks')
-    print(bcolors.WARNYELLOW + str(submitlimits) + ' unsuccessful (limit)')
-    print(bcolors.SRSYELLOW + str(submiterrors) + ' unsuccessful (error)')
-    print(bcolors.BADRED + str(submitfailures) + ' failed' + bcolors.ENDC)
+    print(str(v.submitsuccesses) + ' successful')
+    print(str(v.submitasks) + ' asks')
+    print(bcolors.WARNYELLOW + str(v.submitlimits) + ' unsuccessful (limit)')
+    print(bcolors.SRSYELLOW + str(v.submiterrors) + ' unsuccessful (error)')
+    print(bcolors.BADRED + str(v.submitfailures) + ' failed' + bcolors.ENDC)
 
-    global klist
-    klist = []
+
+    v.klist = []
 
     get_keywords()
 
     #see if they want to do asks
-    if(int(ask_about_processing('asks', './.sys/.ask.csv')) == 1):
+    if(int(ask_about_processing('asks', v.askfile)) == 1):
         #they want to do asks
-        manually_process('./.sys/.ask.csv')
+        manually_process(v.askfile)
+        os.remove(v.askfile)
+
+    #see if they want to do limit errors
+    if(int(ask_about_processing('limit errors', v.slimitfile)) == 1):
+        #they want to do asks
+        manually_process(v.slimitfile)
+        os.remove(v.slimitfile)
+
+    #see if they want to do regular errors
+    if(int(ask_about_processing('other errors', v.serrorfile)) == 1):
+        #they want to do asks
+        manually_process(v.serrorfile)
+        os.remove(v.serrorfile)
+
 
 
 
