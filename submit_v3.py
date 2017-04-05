@@ -786,14 +786,14 @@ def get_entry_field():
 
     except TimeoutException as e:
         print(bcolors.BADRED, end='')
-        print('get_v.entry_field error: ', \
+        print('get_entry_field error: ', \
         'the text entry box took too long to load or could not be found.', \
         end='')
         print(bcolors.ENDC)
         log_error(e)
         save_and_exit()
     except Exception as e:
-        print(bcolors.BADRED + 'get_v.entry_field error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_entry_field error' + bcolors.ENDC)
         log_error(e)
         save_and_exit()
 
@@ -806,14 +806,14 @@ def get_check_button():
 
     except TimeoutException as e:
         print(bcolors.BADRED, end='')
-        print('get_v.check_button error: ', \
+        print('get_check_button error: ', \
         'the check button took too long to load or could not be found.', \
         end='')
         print(bcolors.ENDC)
         log_error(e)
         save_and_exit()
     except Exception as e:
-        print(bcolors.BADRED + 'get_v.check_button error' + bcolors.ENDC)
+        print(bcolors.BADRED + 'get_check_button error' + bcolors.ENDC)
         log_error(e)
         save_and_exit()
 
@@ -1309,7 +1309,8 @@ if __name__ == "__main__":
 
 
 
-
+    os.remove(v.savefile)
+    #done; don't need this anymore
 
 
 
