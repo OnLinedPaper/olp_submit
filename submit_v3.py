@@ -32,6 +32,8 @@ import re
 #for keyword processing
 import datetime
 #misc use, mostly for error logging
+import time
+#for writing my own delays
 
 import vars as v
 
@@ -679,10 +681,33 @@ def handle_group_error():
 #returns an empry string otherwise
 def get_success_message():
     try:
-        sleep(1)
         success_status = v.modal_box \
         .find_element_by_class_name('success_message')
         #get the success message box.
+        error_status = v.modal_box \
+        .find_element_by_class_name('error_message')
+        #get the error message box.
+
+        cust_delay = time.time() + v.delay
+        #set a 4 second timer
+        
+        while(cust_delay > time.time()):
+            #while the custom delay has not expired
+
+            if(success_status.get_attribute('style') != 'display: block;'\
+            and error_status.get_attribute('style') != 'display: block;'):
+                #neither is visible - refresh both
+
+                success_status = v.modal_box \
+                .find_element_by_class_name('success_message')
+                #refresh the success message box.
+                error_status = v.modal_box \
+                .find_element_by_class_name('error_message')
+                #refresh the error message box.
+            else:
+                #one of them showed up
+                break
+
         if(success_status.get_attribute('style') == 'display: block;'):
             #the success message is showing. return the text of the message.
             return(str(success_status.find_element_by_tag_name('span').text))
@@ -958,7 +983,7 @@ def submit_to_folder(row):
 
             for option in folderoptions:
                 #iterate through all folders, trying to find the right one
-                if(int(option.get_attribute(value)) == \
+                if(int(option.get_attribute('value')) == \
                 int(row['folder_value'])):
                     #a matching folder value was found
                     option.click()
@@ -996,7 +1021,7 @@ def submit_to_folder(row):
                         return
                     else:
                         #success!
-                        print(bcolors.GOODGREEN + message + bcolros.ENDC)
+                        print(bcolors.GOODGREEN + message + bcolors.ENDC)
                         v.submitsuccesses = v.submitsuccesses + 1
 
                         return
@@ -1200,7 +1225,7 @@ def manually_process(filename):
                                         else:
                                             #success!
                                             print(bcolors.GOODGREEN + \
-                                            message + bcolros.ENDC)
+                                            message + bcolors.ENDC)
 
 
                         except ValueError:
