@@ -690,7 +690,7 @@ def get_success_message():
 
         cust_delay = time.time() + v.delay
         #set a 4 second timer
-        
+
         while(cust_delay > time.time()):
             #while the custom delay has not expired
 
@@ -973,6 +973,8 @@ def process_row(row):
 #takes a row as argument, submits it to the group, and returns nothing
 def submit_to_folder(row):
     try:
+        print('\nfor group: \"' + row['group_name'] +'\"')
+
         send_error = send_group_name(row['group_name'])
         #send the group name. if it got an error, handle it.
 
@@ -1009,13 +1011,16 @@ def submit_to_folder(row):
                         write_me = [row['group_name'], \
                         row['folder_name'], row['folder_value']]
 
-                        if 'limit' in message:
-                            #some sort of limit error, these happen a lot
+                        if 'size' in message:
+                            #folder was over size limit
+                            write_a_row(v.serrorfile, write_me)
+                        elif 'limit' in message:
+                            #user hit submission limit
                             write_a_row(v.slimitfile, write_me)
                             v.submitlimits = v.submitlimits + 1
                         else:
                             #needs to be addressed
-                            write_a_row(v.serrorfile, row)
+                            write_a_row(v.serrorfile, write_me)
                             v.submiterrors = v.submiterrors + 1
 
                         return
@@ -1030,6 +1035,7 @@ def submit_to_folder(row):
             #print an error and add it to the list
             message = '(could not find specified folder.)'
             print(bcolors.WARNYELLOW + message + bcolors.ENDC)
+            write_a_row(v.serrorfile, row)
             v.submiterrors = v.submiterrors + 1
 
         else:
@@ -1037,6 +1043,17 @@ def submit_to_folder(row):
             #print error and do nothing
             print(bcolors.WARNYELLOW + send_error + bcolors.ENDC)
             v.submitfailures = v.submitfailures + 1
+
+    except TimeoutException:
+        #couldn't submit it, just ignore it.
+        message = '(submit_to_folder warning: something took too long.)'
+        print(bcolors.WARNYELLOW + message + bcolors.ENDC)
+
+        write_me = [row['group_name'], \
+        row['folder_name'], row['folder_value']]
+        write_a_row(v.serrorfile, write_me)
+        #continue with normal operation
+        return
 
     except Exception as e:
         print(bcolors.BADRED + 'submit_to_folder error' + bcolors.ENDC)
@@ -1139,17 +1156,17 @@ def manually_process(filename):
                 #make sure this is a valid group
 
                 if not error_message:
-                    #send the group name
-                    opt = get_folder_options()
-                    #get the options
-
-                    print('for group:', row['group_name'])
-                    folder_num = 0
-                    folder_num = print_folders(opt)
-                    #print the folder options
                     choice = -1
 
                     while(str(choice) == '-1'):
+                        #send the group name
+                        opt = get_folder_options()
+                        #get the options
+
+                        print('\nfor group: ', row['group_name'])
+                        folder_num = 0
+                        folder_num = print_folders(opt)
+                        #print the folder options
                         try:
                             choice = input('folder #')
                             if(str(choice) == 'i'):
@@ -1220,6 +1237,8 @@ def manually_process(filename):
                                             print(bcolors.WARNYELLOW + \
                                             message + bcolors.ENDC)
 
+                                            #get folder options again
+                                            send_group_name(row['group_name'])
                                             #try again
                                             choice = -1
                                         else:

@@ -1,6 +1,6 @@
 
-delay = 4
-#if something takes longer than 4 seconds, something is up
+delay = 2
+#if something takes longer than 2 seconds, something is up
 fieldnames = ['group_name', 'folder_name', 'folder_value']
 #these will be used by CSV files
 
