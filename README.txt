@@ -16,13 +16,14 @@ run group_read first to get a list of all groups you are a part of.
 
 run list_make next to make specific lists for different types of art.
 
-run submit_v2 last to begin the automated submission process. 
+run submit_v3 last to begin the automated submission process.
 
 ===============================================================================
 
 GENERAL USAGE NOTES
 
-- V3 IS STILL UNDER CONSTRUCTION. PLEASE USE V2.
+- V3 IS IN STABLE ALPHA. Submit functionality is implemented; save
+  functionality is not. When presented with a save file, just delete it.
 - use group_read.py to make a list of groups, list_make to create
   specialized lists for different art types, and submit to submit things
   to dA.
@@ -30,7 +31,7 @@ GENERAL USAGE NOTES
   ignore this and do manage to break the program, though, please send me a copy
   of the .errorarchive.txt file so I can fix what went wrong. It'll be in the
   data folder)
-- once you start using submit_v2.py, the main submission program, don't stop
+- once you start using submit_v3.py, the main submission program, don't stop
   until execution is completed - it can't save your progress yet.
 
 ===============================================================================

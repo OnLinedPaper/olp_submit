@@ -10,6 +10,8 @@ from selenium.common.exceptions import TimeoutException
 #for when waiting for stuff to load takes too long
 from selenium.common.exceptions import WebDriverException
 #for if the user closes the browser window
+from selenium.common.exceptions import StaleElementReferenceException
+#for if the user submits to a group that can be used
 from selenium.webdriver.common.by import By
 #also used when waiting for stuff to load
 #bunch of selenium things
@@ -51,6 +53,8 @@ class bcolors:
     ENDC = '\033[0m'
 
 #------------------------------------------------------------------------------
+#signal handling function, designed to catch Ctrl-C and exit gracefully
+#not currently implemented
 def signal_handler(signal, frame):
     save_and_exit()
 
@@ -420,6 +424,10 @@ def check_row_corruption(row):
         exit()
 
 #------------------------------------------------------------------------------
+#csv file function
+#accepts a csv file name and a row, opens it in append mode, and writes the
+#specified row to that file in append mode.
+#returns nothing.
 def write_a_row(filename, row):
     try:
         #add the row to the file
@@ -432,6 +440,30 @@ def write_a_row(filename, row):
 
     except Exception as e:
         print(bcolors.BADRED + 'write_a_row error' + bcolors.ENDC)
+        log_error(e)
+        exit()
+
+#------------------------------------------------------------------------------
+#csv file function
+#takes a file name as an argument, counts the number of rows that will be
+#submitted (anything that's not "-1") and returns this value as an int
+def get_row_count(filename):
+    try:
+        group_count = 0;
+
+        #open the filename
+        with open(filename) as csvfile:
+            #open file to read
+            reader = csv.DictReader(csvfile)
+
+            for row in reader:
+                    group_count += 1
+
+        #send the count back
+        return group_count
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_submittable_rows error' + bcolors.ENDC)
         log_error(e)
         exit()
 
@@ -855,14 +887,14 @@ def send_group_name(name):
         v.check_button.click()
         #submit it
 
-        element_present = EC.visibility_of_element_located \
+        element_visible = EC.visibility_of_element_located \
         ((By.CLASS_NAME, 'selected_group_info'))
-        WebDriverWait(v.drivr, v.delay).until(element_present)
+        WebDriverWait(v.drivr, v.delay).until(element_visible)
 
         #the group info appeared; we can continue
         return ''
 
-    except TimeoutException as e:
+    except TimeoutException:
         #the group info never appeared - an error probably occurred.
         return(handle_group_error())
 
@@ -1027,7 +1059,12 @@ def submit_to_folder(row):
                     else:
                         #success!
                         print(bcolors.GOODGREEN + message + bcolors.ENDC)
-                        v.submitsuccesses = v.submitsuccesses + 1
+                        if('pending' in message):
+                            #pending approval
+                            v.submitpendings = v.submitpendings + 1
+                        else:
+                            #approved automatically
+                            v.submitsuccesses = v.submitsuccesses + 1
 
                         return
             #if we reached this point, we went through all the folders but
@@ -1071,7 +1108,7 @@ def ask_about_processing(inname, filename):
         response = ''
         while not any(s in response for s in ['y', 'l']):
             #get them to answer yes or later ('no' means they want to delete)
-            message = 'process '
+            message = '\nprocess '
             message = message + name
             message = message + '? yes\\no\\later (y\\n\\l): '
             response = input(message)
@@ -1142,6 +1179,10 @@ def save_and_exit():
         logout()
 
 #------------------------------------------------------------------------------
+#manual processing function
+#accepts a file name as an argument, and then guides the user through the
+#process of manually selecting which folder they would like to submit the
+#deviation to for any valid groups
 def manually_process(filename):
     try:
         with open(filename) as csvfile:
@@ -1266,34 +1307,52 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     #to catch ctrl-c
 
+    print('running setup tasks...')
     setup()
     #run setup functions
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
     csv_file_name = ''
     csv_file_name = get_csv_file()
 
+    print('checking csv file for corruption... ', end='')
     check_csv_corruption(csv_file_name)
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
 
+    print('opening webdriver... ', end='')
     v.drivr = open_webdriver()
-    #declared explicitly as global so any function can close it
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
+    print('getting login information... ')
     login()
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
+    print('getting deviation page... ')
     get_deviation_page(get_dev_url())
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+    print('opening submission box... ', end='')
     open_submission_box()
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
 
+    print('opening modal box... ', end='')
     v.modal_box = get_modal_box()
-    #declared explicitly as global so any function can use it
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
+    print('opening submission box... ', end='')
     open_manual_submission()
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
 
+    print('getting entry field... ', end='')
     v.entry_field = get_entry_field()
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
+    print('getting check button... ', end='')
     v.check_button = get_check_button()
-    #declared explicitly as global so any function can use these
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
 
 
@@ -1309,13 +1368,28 @@ if __name__ == "__main__":
 
     v.activefile = csv_file_name
     #for if we need to exit
+
+    groupnum = 0
+
+    print('getting row count... ', end='')
+    grouptotal = get_row_count(csv_file_name)
+    #get the total number of rows
+    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+    print('\nbeginning automatic submissions.\n')
+
     with open(csv_file_name) as csvfile:
         #open the file
         reader = csv.DictReader(csvfile)
         #get a reader
+
         for row in reader:
             #process all rows
             process_row(row)
+
+            #print where we are
+            groupnum += 1
+            print('(group', str(groupnum), "of", str(grouptotal) + ")")
 
     #   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
     #manual submissions
@@ -1323,6 +1397,7 @@ if __name__ == "__main__":
     #at this point, automated submissions are complete
     print(bcolors.GOODGREEN + 'automated submissions complete')
     print(str(v.submitsuccesses) + ' successful')
+    print(str(v.submitpendings) + ' pending')
     print(str(v.submitasks) + ' asks')
     print(bcolors.WARNYELLOW + str(v.submitlimits) + ' unsuccessful (limit)')
     print(bcolors.SRSYELLOW + str(v.submiterrors) + ' unsuccessful (error)')
@@ -1352,9 +1427,10 @@ if __name__ == "__main__":
         os.remove(v.serrorfile)
 
 
-
+    print('\nall submissions complete.\ncleaning up... ', end='')
     os.remove(v.savefile)
     #done; don't need this anymore
+    print(bcolors.GOODGREEN + 'done.' + bcolors.ENDC)
 
 
 

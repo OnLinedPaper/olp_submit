@@ -21,6 +21,7 @@ submitlimits = 0
 submiterrors = 0
 submitasks = 0
 submitsuccesses = 0
+submitpendings = 0
 
 global drivr
 global modal_box
