@@ -2,3 +2,4 @@
 /.sys
 test.py
 /__pycache__
+debug.log
