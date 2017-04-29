@@ -568,7 +568,7 @@ def get_dev_url():
 #takes no arguments, modifies driver, and returns nothing
 def login():
     try:
-        while('deviantart.com/browse/all/' not in v.drivr.current_url):
+        while('/users/' in v.drivr.current_url):
             #repeat until they log in successfully
             #(it goes to that url when they log in)
             login_not_me()
