@@ -568,6 +568,8 @@ def get_dev_url():
 #takes no arguments, modifies driver, and returns nothing
 def login():
     try:
+        v.drivr.get('https://www.deviantart.com/users/login')
+
         while('/users/' in v.drivr.current_url):
             #repeat until they log in successfully
             #(it goes to that url when they log in)
@@ -776,7 +778,7 @@ def open_submission_box():
         ('groups_links')
         #go to the element that holds the button
         add_button = add_button.find_element_by_class_name \
-        ('submit_to_groups_link')
+        ('jslink')
         #go to the actual button
         add_button.click()
         #click it to open the box
@@ -1046,6 +1048,7 @@ def submit_to_folder(row):
                         if 'size' in message:
                             #folder was over size limit
                             write_a_row(v.serrorfile, write_me)
+                            v.submiterrors = v.submiterrors + 1
                         elif 'limit' in message:
                             #user hit submission limit
                             write_a_row(v.slimitfile, write_me)
