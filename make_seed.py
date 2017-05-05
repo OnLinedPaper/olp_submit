@@ -38,8 +38,6 @@ if __name__ == "__main__":
         writer = csv.DictWriter(newfile, fieldnames=fieldnames)
         writer.writeheader()
 
-    pass
-
 #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 #make the seed
 
@@ -56,4 +54,5 @@ if __name__ == "__main__":
                     #it's either ignored or already assigned; copy it
                     writer.writerow([row['group_name'], row['folder_name'], \
                     row['folder_value']])
-                pass
+
+    print('seed created.')
