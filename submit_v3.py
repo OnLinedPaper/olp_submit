@@ -776,6 +776,9 @@ def open_submission_box():
         #see if we can find the submit button
         add_button = v.drivr.find_element_by_id \
         ('groups_links')
+        #go to the sub-element that holds the button
+        add_button = add_button.find_element_by_class_name \
+        ('submit_to_groups_link')
         #go to the element that holds the button
         add_button = add_button.find_element_by_class_name \
         ('jslink')
