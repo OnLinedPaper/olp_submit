@@ -12,14 +12,20 @@ from selenium.common.exceptions import WebDriverException
 #for if the user closes the browser window
 from selenium.common.exceptions import StaleElementReferenceException
 #for if the user submits to a group that can be used
+from selenium.common.exceptions import NoSuchWindowException
+#for if the user closes the window
+from selenium.common.exceptions import NoSuchElementException
+#for if an element gets lost somewhere
 from selenium.webdriver.common.by import By
 #also used when waiting for stuff to load
 #bunch of selenium things
 import signal
 #to catch CTRL+C
+import shelve
+#for persistent data storage
 
-from sys import exit
-#for when things go wrong
+import sys
+#lots of good stuff in here
 import traceback
 #for error logging
 from time import sleep
@@ -53,10 +59,77 @@ class bcolors:
     ENDC = '\033[0m'
 
 #------------------------------------------------------------------------------
+#print function
+#takes no arguments, returns nothing
+#prints a warning to users, letting them know their session may still be active
+def print_active_session_warning():
+
+    try:
+        print(bcolors.SRSYELLOW, end='')
+        print('\n\n\n    !! WARNING: LOGIN SESSION MAY STILL BE ACTIVE. !!')
+        print('( check at https://www.deviantart.com/settings/sessions )')
+        print(bcolors.ENDC, end='')
+
+    except:
+        pass
+
+#------------------------------------------------------------------------------
+#save file function
+#takes no arguments, tries to close the save file, returns nothing
+def close_save_file():
+
+    try:
+        v.s.close()
+        #save current data
+
+    except TypeError:
+        #the save file wasn't open
+        pass
+
+#------------------------------------------------------------------------------
 #signal handling function, designed to catch Ctrl-C and exit gracefully
-#not currently implemented
 def signal_handler(signal, frame):
-    save_and_exit()
+
+    try:
+        close_save_file()
+
+        print_active_session_warning()
+
+        print(bcolors.GOODGREEN + '\nexiting.' + bcolors.ENDC)
+
+    except:
+        pass
+
+    exit()
+
+#------------------------------------------------------------------------------
+#custom excepthook to catch the exception thrown if the user accidentally
+#closes the browser window, loses internet connection, or any other error
+def except_hook(exctype, value, traceback):
+
+    try:
+        v.s.close()
+        #save the state
+    except TypeError as e:
+        #the save file wasn't open
+        pass
+
+    try:
+        if exctype == ConnectionRefusedError:
+            #connection was lost
+            print(bcolors.BADRED + "failure: connection lost." + bcolors.ENDC)
+        elif exctype == NoSuchWindowException:
+            #window closed
+            print(bcolors.BADRED + "failure: window lost." + bcolors.ENDC)
+        elif exctype == NoSuchElementException:
+            #element was not found
+            print(bcolors.BADRED + "failure: missing element." + bcolors.ENDC)
+        else:
+            #it was some other error, let system handle it
+            sys.__excepthook__(exctype, value, traceback)
+    except:
+        #something went wrong, just let the system handle it
+        sys.__excepthook__(exctype, value, traceback)
 
 #------------------------------------------------------------------------------
 #error logging function
@@ -85,6 +158,8 @@ def log_error(e):
             #write the dash
             earc.write(dash)
 
+            print_active_session_warning()
+
         #print the error for the user to see
         print(bcolors.BADRED, end='')
         print('error type:\t', type(e), '\n\"', e, '\"\n', end='')
@@ -97,11 +172,83 @@ def log_error(e):
         print(e)
 
 #------------------------------------------------------------------------------
+#takes a file name, saves it, and returns nothing
+def save_curr_file(fname):
+    try:
+        v.s['curr_file'] = fname
+
+    except Exception as e:
+        print(bcolors.BADRED + 'save_curr_file error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
+
+#------------------------------------------------------------------------------
+#takes a url, saves it, and returns nothing
+def save_curr_url(url):
+    try:
+        v.s['curr_url'] = url
+
+    except Exception as e:
+        print(bcolors.BADRED + 'save_curr_url error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
+
+#------------------------------------------------------------------------------
+#takes a row, saves it, and returns nothing
+def save_curr_group(group):
+    try:
+        v.s['curr_group'] = group
+
+    except Exception as e:
+        print(bcolors.BADRED + 'save_curr_group error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
+
+#------------------------------------------------------------------------------
+#takes a status, saves it, and returns nothing
+def set_curr_status(status):
+    try:
+        v.s['curr_status'] = int(status)
+
+    except Exception as e:
+        print(bcolors.BADRED + 'set_curr_status error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
+
+#------------------------------------------------------------------------------
+#basic function
+#takes no arguments, asks user a yes/no question, returns y on yes and
+#empty string on no
+def get_yes_no():
+    try:
+        ans = ''
+        #set as blank and then enter a loop to ask user
+        while not any(s in ans[:1] for s in ['y', 'n']):
+            ans = input('(y\\n): ')
+
+        if('y' in ans[:1]):
+            #answer was yes
+            return('y')
+        else:
+            #answer was no
+            return ''
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_yes_no error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
+
+#==============================================================================
+
+#------------------------------------------------------------------------------
 #setup function
 #takes no arguments and sets up the external data
 def setup():
-    #TODO: session processing; if some of these folders exist, an active
-    #session may be present
 
     try:
         #ensure the "data" folder exists
@@ -111,6 +258,7 @@ def setup():
             os.makedirs('data')
             print(bcolors.WARNYELLOW + \
             'please load CSV files into data folder')
+            close_save_file()
             exit()
 
     except Exception as e:
@@ -119,6 +267,7 @@ def setup():
         print('setup error: error while checking for data folder.', end='')
         print(type(e), '\t\"', e, '\"', end='')
         print(bcolors.ENDC)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -135,6 +284,24 @@ def setup():
         print('setup error: error while checking for .sys folder.', end='')
         print(type(e), '\t\"', e, '\"', end='')
         print(bcolors.ENDC)
+        close_save_file()
+        exit()
+
+    #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
+    try:
+        #ensure the .sys/.savedata folder is created
+        if not (os.path.exists('.sys/.savedata')):
+            #savedata folder does not exist
+            os.makedirs('.sys/.savedata')
+
+    except Exception as e:
+        #i don't anticipate an error ever occuring here
+        print(bcolors.BADRED, end='')
+        print('setup error: error while checking for savedata folder.', end='')
+        print(type(e), '\t\"', e, '\"', end='')
+        print(bcolors.ENDC)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -155,6 +322,7 @@ def setup():
         print('setup error: error while setting up errorlog file.', end='')
         print(type(e), '\t\"', e, '\"', end='')
         print(bcolors.ENDC)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -174,71 +342,70 @@ def setup():
         print('setup error: error while setting up errorarchive file.', end='')
         print(type(e), '\t\"', e, '\"', end='')
         print(bcolors.ENDC)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+
     try:
         #set up save file
-        if not os.path.isfile(v.savefile):
-            #if there is not an error archive, make one
-            with open(v.savefile, 'a'):
-                pass
-        else:
-            #a save file exists.
-            choice = ''
-            print(bcolors.GOODGREEN, end='')
-            choice = input \
-            ('a save file has been detected. use/delete/quit (u/d/q): ')
-            print(bcolors.ENDC, end='')
-            #get their choice.
-            if(choice == 'u'):
-                #use the save file
-                pass
-            elif(choice == 'd'):
-                message = 'WARNING: this will delete save file.'
-                message = message + ' are you sure? yes/no (y/n): '
 
-                print(bcolors.SRSYELLOW, end='')
-                choice = input(message)
+        #assign the dict to global variable v.s
+        v.s = shelve.open(v.savefile)
+
+        try:
+            stat = v.s['curr_status']
+            stat = int(stat)
+
+            if(stat != int(-1)):
+                print(bcolors.GOODGREEN, end='')
+                #there is an active session.
+                print('\na save file has been detected.')
+                print('current csv file: ' + v.s['curr_file'])
+                print('current status: ', end='')
+
+                #status switch
+                if(stat == 0):
+                    print('in setup')
+                elif(stat == 1):
+                    print('in automated submissions')
+                elif(stat == 2):
+                    print('in manual submissions')
+
+                while(1):
+                    #check to see if they want to use the sace data
+                    print(bcolors.GOODGREEN, end='')
+                    print('\nuse current file? ', end='')
+                    if not get_yes_no():
+                        #they don't want to use the save file
+                        print(bcolors.SRSYELLOW, end='')
+                        print('\ndelete save file? ', end='')
+                        if get_yes_no():
+                            #they want to delete the file
+                            set_curr_status(-1)
+
+                            print(bcolors.GOODGREEN, end='')
+                            print('save file deleted.\n')
+
+                            #end the loop
+                            break
+                    else:
+                        #preserve the save data and end the loop
+                        print(bcolors.GOODGREEN, end='')
+                        print('using current file.\n')
+                        break
+
                 print(bcolors.ENDC, end='')
 
-                if(choice == 'y'):
-                    #wipe everything
-                    try:
-                        os.remove(v.askfile)
-                    except:
-                        pass
-                    try:
-                        os.remove(v.replacefile)
-                    except:
-                        pass
-                    try:
-                        os.remove(v.slimitfile)
-                    except:
-                        pass
-                    try:
-                        os.remove(v.serrorfile)
-                    except:
-                        pass
-                    try:
-                        os.remove(v.savefile)
-                    except:
-                        pass
-
-                    with open(v.savefile, 'a'):
-                        pass
-            else:
-                #exit the program
-                exit()
-
+        except KeyError as e:
+            #a save file did not exist; opening it has created it.
+            set_curr_status(-1)
 
     except Exception as e:
-        #if an error occurs here, it's probably something to do with the
-        #error archive. this is one of two except functions that won't call
-        #log_error, since it would try to reference a bad file.
         print(bcolors.BADRED, end='')
         print('setup error: error while setting up save file.' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -259,6 +426,7 @@ def setup():
         'setup error: error while setting up replace file.' + \
         bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -280,6 +448,7 @@ def setup():
         'setup error: error while setting up ask later file.' + \
         bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -301,6 +470,7 @@ def setup():
         'setup error: error while setting up error handling file.' + \
         bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
     #-   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
@@ -322,6 +492,7 @@ def setup():
         'setup error: error while setting up limit handling file.' + \
         bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -352,13 +523,14 @@ def get_csv_file():
     except Exception as e:
         print(bcolors.BADRED + 'get_csv_file error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
 #csv file function
 #takes a csv file name, returns nothing
 #(will exit program if corruption is detected)
-def check_csv_corruption(file):
+def check_csv_corruption(csv_file_name):
     try:
         i = 0
         #group number
@@ -384,6 +556,7 @@ def check_csv_corruption(file):
             print('\nplease fix corrupted row(s) before continuing\n(exiting)', \
             end='')
             print(bcolors.ENDC)
+            close_save_file()
             exit()
         else:
             return
@@ -391,6 +564,7 @@ def check_csv_corruption(file):
     except Exception as e:
         print(bcolors.BADRED + 'get_csv_file error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -421,6 +595,7 @@ def check_row_corruption(row):
     except Exception as e:
         print(bcolors.BADRED + 'check_row_corruption error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -441,6 +616,7 @@ def write_a_row(filename, row):
     except Exception as e:
         print(bcolors.BADRED + 'write_a_row error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -465,6 +641,7 @@ def get_row_count(filename):
     except Exception as e:
         print(bcolors.BADRED + 'get_submittable_rows error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -479,6 +656,7 @@ def open_webdriver():
         #the driver is not open
         print(bcolors.BADRED + 'open_webdriver error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -499,6 +677,7 @@ def close_webdriver():
         #something went wrong, abort the program.
         print(bcolors.BADRED + 'close_webdriver error' + bcolors.ENDC)
         log_error(e)
+        close_save_file()
         exit()
 
 #==============================================================================
@@ -523,6 +702,7 @@ def get_username():
         print(bcolors.BADRED + 'get_username error' + bcolors.ENDC)
         log_error(e)
         close_webdriver()
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -542,6 +722,7 @@ def get_password():
         print(bcolors.BADRED + 'get_password error' + bcolors.ENDC)
         log_error(e)
         close_webdriver()
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -554,6 +735,9 @@ def get_dev_url():
         while not dpage:
             #loop until a non-empty deviation url is entered
             dpage = input('paste the deviation\'s URL: ')
+
+        save_curr_url(dpage)
+        #save the current URL
         return dpage
 
     except Exception as e:
@@ -561,6 +745,7 @@ def get_dev_url():
         print(bcolors.BADRED + 'get_dev_url error' + bcolors.ENDC)
         log_error(e)
         close_webdriver()
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -582,6 +767,7 @@ def login():
         print(bcolors.BADRED + 'login error' + bcolors.ENDC)
         log_error(e)
         close_webdriver()
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -644,6 +830,7 @@ def login_send_keys(uname, pword):
         print(bcolors.BADRED + 'login_send_keys error' + bcolors.ENDC)
         log_error(e)
         close_webdriver()
+        close_save_file()
         exit()
 
 #------------------------------------------------------------------------------
@@ -660,6 +847,7 @@ def logout():
         print('exiting.' + bcolors.ENDC)
         #all clear
         close_webdriver()
+        close_save_file()
         exit()
 
     except WebDriverException as e:
@@ -677,6 +865,7 @@ def logout():
         print(bcolors.BADRED + 'logout error' + bcolors.ENDC)
         log_error(e)
         close_webdriver()
+        close_save_file()
         exit()
 
 #==============================================================================
@@ -706,7 +895,8 @@ def handle_group_error():
     except Exception as e:
         print(bcolors.BADRED + 'handle_group_error error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #submission sub-function
@@ -752,7 +942,8 @@ def get_success_message():
     except Exception as e:
         print(bcolors.BADRED + 'get_success_message error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #navigation function
@@ -766,7 +957,8 @@ def get_deviation_page(dpage):
     except Exception as e:
         print(bcolors.BADRED + 'get_deviation_page error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #setup function
@@ -799,11 +991,13 @@ def open_submission_box():
         end='')
         print(bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
     except Exception as e:
         print(bcolors.BADRED + 'open_submission_box error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #setup function
@@ -816,7 +1010,8 @@ def get_modal_box():
     except Exception as e:
         print(bcolors.BADRED + 'get_v.modal_box error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #setup function
@@ -837,7 +1032,8 @@ def open_manual_submission():
     except Exception as e:
         print(bcolors.BADRED + 'open_submission_box error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #setup function
@@ -853,11 +1049,13 @@ def get_entry_field():
         end='')
         print(bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
     except Exception as e:
         print(bcolors.BADRED + 'get_entry_field error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #setup function
@@ -873,11 +1071,13 @@ def get_check_button():
         end='')
         print(bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
     except Exception as e:
         print(bcolors.BADRED + 'get_check_button error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #submission function
@@ -906,7 +1106,8 @@ def send_group_name(name):
     except Exception as e:
         print(bcolors.BADRED + 'send_group_name error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #submission function
@@ -924,7 +1125,8 @@ def get_folder_options():
     except Exception as e:
         print(bcolors.BADRED + 'get_folder_options error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #submission function
@@ -963,7 +1165,8 @@ def print_folders(folders):
     except Exception as e:
         print(bcolors.BADRED + 'print_folders error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #sutomated submission function
@@ -972,9 +1175,6 @@ def print_folders(folders):
 #asked about later, and submits others.
 def process_row(row):
     try:
-        v.activegroup = row['group_name']
-        #in case we have to save and exit
-
         f_val = int(row['folder_value'])
         #save this for ease of use
 
@@ -1000,10 +1200,14 @@ def process_row(row):
         else:
             submit_to_folder(row)
 
+        save_curr_group(row['group_name'])
+        #save row for later
+
     except Exception as e:
         print(bcolors.BADRED + 'process_row error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #automated submission function
@@ -1101,7 +1305,8 @@ def submit_to_folder(row):
     except Exception as e:
         print(bcolors.BADRED + 'submit_to_folder error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #manual submission function
@@ -1139,7 +1344,8 @@ def ask_about_processing(inname, filename):
     except Exception as e:
         print(bcolors.BADRED + 'ask_about_processing error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #takes no arguments, modifies v.klist, and returns nothing
@@ -1164,25 +1370,8 @@ def get_keywords():
     except Exception as e:
         print(bcolors.BADRED + 'get_keywords error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
-
-#------------------------------------------------------------------------------
-#takes no arguments, saves the current state, returns nothing
-def save_and_exit():
-    try:
-        with open(v.savefile, 'a') as v.savefile:
-            #open the file; write the csv file
-            #we were in and the group
-            v.savefile.write(v.activefile)
-            v.savefile.write('\n')
-            v.savefile.write(v.activegroup)
-            #now exit
-            logout()
-
-    except Exception as e:
-        print(bcolors.BADRED + 'save_and_exit error' + bcolors.ENDC)
-        log_error(e)
-        logout()
+        close_save_file()
+        exit()
 
 #------------------------------------------------------------------------------
 #manual processing function
@@ -1196,8 +1385,6 @@ def manually_process(filename):
             reader = csv.DictReader(csvfile)
             #get a reader
             for row in reader:
-                v.activegroup = row['group_name']
-                #for if we have to save and exit
                 error_message = ''
                 error_message = send_group_name(row['group_name'])
                 #make sure this is a valid group
@@ -1246,7 +1433,8 @@ def manually_process(filename):
                                 pass
                             elif(str(choice) == 'x'):
                                 #save and exit
-                                save_and_exit()
+                                close_save_file()
+                                exit()
                             elif(str(choice) == 'p'):
                                 #reprint folder options
                                 print('for group:', row['group_name'])
@@ -1302,46 +1490,120 @@ def manually_process(filename):
                     print(error_message, end='')
                     print(bcolors.ENDC)
 
+                save_curr_group(row['group_name'])
+                #save row for later
+
+    except FileNotFoundError:
+        #file was already processed or was not found
+        print('file not found: \'' + filename +'\'')
+
+        return
+
     except Exception as e:
         print(bcolors.BADRED + 'manually_process error' + bcolors.ENDC)
         log_error(e)
-        save_and_exit()
+        close_save_file()
+        exit()
+
+#==============================================================================
+#main subfunctions
+
+#------------------------------------------------------------------------------
+def get_parameters_from_user():
+    try:
+        csv_file_name = ''
+        csv_file_name = get_csv_file()
+
+        print('checking csv file for corruption... ', end='')
+        check_csv_corruption(csv_file_name)
+        #ask user for csv file name
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+        save_curr_file(csv_file_name)
+        #start the save data
+
+        print('opening webdriver... ', end='')
+        v.drivr = open_webdriver()
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+        print('getting login information... ')
+        login()
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+        print('getting deviation page... ')
+        get_deviation_page(get_dev_url())
+        #ask user for URL
+        #(this function saves url)
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_parameters_from_user error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
+
+#------------------------------------------------------------------------------
+def get_parameters_from_save():
+    try:
+        csv_file_name = ''
+        csv_file_name = v.s['curr_file']
+        #load CSV file from save
+
+        print('checking csv file for corruption... ', end='')
+        check_csv_corruption(csv_file_name)
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+        print('opening webdriver... ', end='')
+        v.drivr = open_webdriver()
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+        print('getting login information... ')
+        login()
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+        print('getting deviation page... ')
+        get_deviation_page(v.s['curr_url'])
+        #load URL from save file
+        print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
+
+    except Exception as e:
+        print(bcolors.BADRED + 'get_parameters_from_save error' + bcolors.ENDC)
+        log_error(e)
+        close_save_file()
+        exit()
 
 #==============================================================================
 #main function
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     #to catch ctrl-c
+    sys.excepthook = except_hook
+    #to catch some errors
 
     print('running setup tasks...')
     setup()
     #run setup functions
     print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
+    #load user's parameters
+    if(int(v.s['curr_status']) == int(-1)):
+        #no save file exists
+        get_parameters_from_user()
+
+        set_curr_status(0)
+        #set status to zero to indicate things are happening
+    else:
+        #a save file exists
+        get_parameters_from_save()
+
     csv_file_name = ''
-    csv_file_name = get_csv_file()
+    csv_file_name = v.s['curr_file']
+    #get the current file
 
-    print('checking csv file for corruption... ', end='')
-    check_csv_corruption(csv_file_name)
-    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
-
-
-    print('opening webdriver... ', end='')
-    v.drivr = open_webdriver()
-    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
-
-    print('getting login information... ')
-    login()
-    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
-
-    print('getting deviation page... ')
-    get_deviation_page(get_dev_url())
-    print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
     print('opening submission box... ', end='')
     open_submission_box()
     print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
-
 
     print('opening modal box... ', end='')
     v.modal_box = get_modal_box()
@@ -1361,55 +1623,105 @@ if __name__ == "__main__":
     print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
 
-
-
-    #with open(v.savefile) as s:
-    #    savedata = [x.strip for x in s.readlines()]
-    #    #savedata[0] has filename, savedata[1] has groupname
-    #if(savedata[0]):
-    #    #there is a file in here
-
-
-    #   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
-    #automated submissions
-
-    v.activefile = csv_file_name
-    #for if we need to exit
-
-    groupnum = 0
-
     print('getting row count... ', end='')
     grouptotal = get_row_count(csv_file_name)
     #get the total number of rows
     print(bcolors.GOODGREEN + 'done.\n' + bcolors.ENDC)
 
-    print('\nbeginning automatic submissions.\n')
-
-    with open(csv_file_name) as csvfile:
-        #open the file
-        reader = csv.DictReader(csvfile)
-        #get a reader
-
-        for row in reader:
-            #process all rows
-            process_row(row)
-
-            #print where we are
-            groupnum += 1
-            print('(group', str(groupnum), "of", str(grouptotal) + ")")
 
     #   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
-    #manual submissions
+    #automated submissions
 
-    #at this point, automated submissions are complete
-    print(bcolors.GOODGREEN + 'automated submissions complete')
-    print(str(v.submitsuccesses) + ' successful')
-    print(str(v.submitpendings) + ' pending')
-    print(str(v.submitasks) + ' asks')
-    print(bcolors.WARNYELLOW + str(v.submitlimits) + ' unsuccessful (limit)')
-    print(bcolors.SRSYELLOW + str(v.submiterrors) + ' unsuccessful (error)')
-    print(bcolors.BADRED + str(v.submitfailures) + ' failed' + bcolors.ENDC)
+    groupnum = 0
 
+
+    if(int(v.s['curr_status']) == int(0)):
+        #nothing was in progress: start manual submissions
+
+        print('\nbeginning automatic submissions.\n')
+
+        set_curr_status(1)
+        #working on automatic submissions
+
+        with open(csv_file_name) as csvfile:
+            #open the file
+            reader = csv.DictReader(csvfile)
+            #get a reader
+
+            for row in reader:
+                #process all rows
+                process_row(row)
+
+                #print where we are
+                groupnum += 1
+                print('(group', str(groupnum), "of", str(grouptotal) + ")")
+
+    elif(int(v.s['curr_status']) == int(1)):
+        #automatic submissions were in progress
+        #fast forward to where they were
+
+        print('\ncontinuing automatic submissions.\n')
+
+        with open(csv_file_name) as csvfile:
+            #open the file
+            reader = csv.DictReader(csvfile)
+            #get a reader
+
+            cont = 0;
+            #we will use this to fast forward to the current row
+
+            for row in reader:
+                if not cont:
+                    #we haven't found the row yet
+                    try:
+                        if(v.s['curr_group'] == row['group_name']):
+                            #group names match
+                            #(checking on group names because dA guarantees
+                            #these will be unique, but other values may not be,
+                            #i.e. ASK or UNUSED folders)
+                            cont = 1
+                            #resume processing
+                        else:
+                            #skip this one
+                            groupnum += 1
+                    except EOFError:
+                        #will happen if key lookup fails
+                        print(bcolors.WARNYELLOW + \
+                        'warning: group not found. save file may be corrupt.',\
+                        end='')
+                        print(bcolors.ENDC)
+                        logout()
+
+                else:
+                    #process all remaining rows
+                    process_row(row)
+
+                    #print where we are
+                    groupnum += 1
+                    print('(group', str(groupnum), "of", str(grouptotal) + ")")
+
+        #   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+        #manual submissions
+        #at this point, automated submissions are complete
+
+        print(bcolors.GOODGREEN + \
+            'automated submissions complete')
+        print(str(v.submitsuccesses) + \
+            ' successful')
+        print(str(v.submitpendings) + \
+            ' pending')
+        print(str(v.submitasks) + \
+            ' asks')
+        print(bcolors.WARNYELLOW + str(v.submitlimits) + \
+            ' unsuccessful (limit)')
+        print(bcolors.SRSYELLOW + str(v.submiterrors) + \
+            ' unsuccessful (error)')
+        print(bcolors.BADRED + str(v.submitfailures) + \
+            ' failed' + bcolors.ENDC)
+
+        set_curr_status(2)
+
+    #other submissions
 
     v.klist = []
 
@@ -1419,26 +1731,42 @@ if __name__ == "__main__":
     if(int(ask_about_processing('asks', v.askfile)) == 1):
         #they want to do asks
         manually_process(v.askfile)
-        os.remove(v.askfile)
+        try:
+            os.remove(v.askfile)
+        except FileNotFoundError:
+            #file wasn't there
+            pass
 
     #see if they want to do limit errors
     if(int(ask_about_processing('limit errors', v.slimitfile)) == 1):
         #they want to do asks
         manually_process(v.slimitfile)
-        os.remove(v.slimitfile)
+        try:
+            os.remove(v.slimitfile)
+        except FileNotFoundError:
+            #file wasn't there
+            pass
 
     #see if they want to do regular errors
     if(int(ask_about_processing('other errors', v.serrorfile)) == 1):
         #they want to do asks
         manually_process(v.serrorfile)
-        os.remove(v.serrorfile)
+        try:
+            os.remove(v.serrorfile)
+        except FileNotFoundError:
+            #file wasn't there
+            pass
 
 
     print('\nall submissions complete.\ncleaning up... ', end='')
-    os.remove(v.savefile)
-    #done; don't need this anymore
+
+    try:
+        set_curr_status(-1)
+        #nothing else in here matters
+    except:
+        #don't ever expect an error here
+        pass
+
     print(bcolors.GOODGREEN + 'done.' + bcolors.ENDC)
-
-
 
     logout()
