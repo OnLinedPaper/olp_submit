@@ -1282,7 +1282,8 @@ def submit_to_folder(row):
             #print an error and add it to the list
             message = '(could not find specified folder.)'
             print(bcolors.WARNYELLOW + message + bcolors.ENDC)
-            write_a_row(v.serrorfile, row)
+            write_a_row(v.serrorfile, \
+            [row['group_name'], row['folder_name'], row['folder_value']])
             v.submiterrors = v.submiterrors + 1
 
         else:
@@ -1704,22 +1705,22 @@ if __name__ == "__main__":
         #manual submissions
         #at this point, automated submissions are complete
 
-        print(bcolors.GOODGREEN + \
-            'automated submissions complete')
-        print(str(v.submitsuccesses) + \
-            ' successful')
-        print(str(v.submitpendings) + \
-            ' pending')
-        print(str(v.submitasks) + \
-            ' asks')
-        print(bcolors.WARNYELLOW + str(v.submitlimits) + \
-            ' unsuccessful (limit)')
-        print(bcolors.SRSYELLOW + str(v.submiterrors) + \
-            ' unsuccessful (error)')
-        print(bcolors.BADRED + str(v.submitfailures) + \
-            ' failed' + bcolors.ENDC)
+    print(bcolors.GOODGREEN + \
+        'automated submissions complete')
+    print(str(v.submitsuccesses) + \
+        ' successful')
+    print(str(v.submitpendings) + \
+        ' pending')
+    print(str(v.submitasks) + \
+        ' asks')
+    print(bcolors.WARNYELLOW + str(v.submitlimits) + \
+        ' unsuccessful (limit)')
+    print(bcolors.SRSYELLOW + str(v.submiterrors) + \
+        ' unsuccessful (error)')
+    print(bcolors.BADRED + str(v.submitfailures) + \
+        ' failed' + bcolors.ENDC)
 
-        set_curr_status(2)
+    set_curr_status(2)
 
     #other submissions
 
