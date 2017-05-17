@@ -329,6 +329,8 @@ except:
 try:
     existing_groups = {}
     #to hold the existing groups. only used in append mode.
+    target_groups = {}
+    #to hold the groups in groups.csv
     with open(csv_file_name, csv_mode) as newfile:
         #open the to-be-created file
         if(csv_mode != 'a'):
@@ -343,14 +345,23 @@ try:
         #normal csv writer
         with open('./data/groups.csv') as groupfile:
             #open the group data file
+
+            target_groups_count = 0
             with open('./data/groups.csv') as tempread:
                 #read through existing groups and get a count
                 temp_reader = csv.DictReader(tempread)
-                total_groups_count = 0
                 for row in temp_reader:
-                    #add one to the total groups
-                    total_groups_count += 1
+                    #get every to-be-added group
+                    if(str(row['group_name']) not in target_groups):
+                        target_groups[str(row['group_name'])] = ''
+                        #add one to the total groups
+                        target_groups_count += 1
+                    else:
+                        #dupe
+                        print('duplicate group detected in groups.csv:', \
+                        str(row['group_name']))
                 #reader should close
+
             reader = csv.DictReader(groupfile)
             #get a reader for the data file
             existing_groups_count = 0
@@ -365,13 +376,23 @@ try:
                     for row in temp_reader:
                         #get every already-existing row and ignore it
                         #in the reader
-                        existing_groups[str(row['group_name'])] = ''
-                        #add it to a dictinary
-                        existing_groups_count += 1
-                        #keep track of how many groups already added
+                        if(str(row['group_name']) in target_groups and \
+                        str(row['group_name']) not in existing_groups):
+                            #track only the groups that are in the to-be-added
+                            #groups. groups that are not in here should not be
+                            #tracked. (the user has left these groups.)
+                            existing_groups[str(row['group_name'])] = ''
+                            #add it to a dictinary
+                            existing_groups_count += 1
+                            #keep track of how many groups already added
+                        else:
+                            #dupe
+                            print('duplicate group detected in ' + \
+                            csv_file_name + ':',
+                            str(row['group_name']))
             print('(', existing_groups_count, 'groups in this list,', \
-            total_groups_count, 'groups total,', \
-            (total_groups_count - existing_groups_count), 'remain)')
+            target_groups_count, 'groups total,', \
+            (target_groups_count - existing_groups_count), 'remain)')
             for row in reader:
                 #iterate through all groups
 
@@ -382,10 +403,9 @@ try:
                     #OR if it's not append mode
                     print('')
 
-                    if(existing_groups_count % 10 == 0):
-                        print('( group', existing_groups_count, 'of', \
-                        total_groups_count, ')')
                     existing_groups_count += 1
+                    print('( group', existing_groups_count, 'of', \
+                    target_groups_count, ')')
 
                     print('include group:', end='')
                     print(bcolors.BOLD, '', end='')
